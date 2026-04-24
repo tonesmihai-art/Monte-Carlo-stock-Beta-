@@ -94,8 +94,25 @@ export function updateValuare() {
     growth: getNum('growth'), wacc: getNum('wacc'), tgr: getNum('tgr'),
     assets: getNum('assets'), cash: getNum('cash'), debt: getNum('debt'),
     shares: getNum('shares'),
+    dividend:  getNum('dividend'),
+    ltv:       getNum('ltv'),
+    occupancy: getNum('occupancy'),
   };
-  const { valEPS, valFCF, valNAV, valDCF, weighted, w, growthCapped } = calcValuare({ ...inputs, sector });
+
+  // Calculeaza si afiseaza dividend yield automat
+  const priceForYield = curPrice || 0;
+  const yieldEl = $('val-div-yield');
+  const yieldCalcEl = $('val-div-yield-calc');
+  if (inputs.dividend > 0 && priceForYield > 0) {
+    const yieldPct = (inputs.dividend / priceForYield) * 100;
+    if (yieldEl) yieldEl.value = yieldPct.toFixed(2);
+    if (yieldCalcEl) yieldCalcEl.textContent = `(${yieldPct.toFixed(2)}%)`;
+  } else {
+    if (yieldEl) yieldEl.value = '';
+    if (yieldCalcEl) yieldCalcEl.textContent = '';
+  }
+
+  const { valEPS, valFCF, valNAV, valDCF, valDDM, weighted, w, growthCapped } = calcValuare({ ...inputs, sector });
 
   function fv(v) { return v != null ? `${sym}${v.toFixed(2)}` : '—'; }
 
@@ -157,6 +174,26 @@ export function updateValuare() {
     ${card('Val. FCF', valFCF, formulaFCF, w.fcf)}
     ${card('Val. NAV', valNAV, formulaNAV, w.nav)}
     ${card('Val. DCF', valDCF, formulaDCF, w.dcf)}
+    ${(() => {
+      if (!inputs.dividend || inputs.dividend <= 0) return '';
+      const yieldPct = priceForYield > 0 ? (inputs.dividend / priceForYield * 100) : null;
+      const dyColor  = !yieldPct      ? '#888'
+                     : yieldPct < 2   ? '#ffee58'
+                     : yieldPct < 6   ? '#66bb6a'
+                     : yieldPct < 10  ? '#ffa726'
+                     :                  '#ef5350';
+      const dyLabel  = !yieldPct      ? ''
+                     : yieldPct < 2   ? 'Redus'
+                     : yieldPct < 6   ? 'Atractiv'
+                     : yieldPct < 10  ? 'Ridicat — verifică sustenabilitatea'
+                     :                  'Excesiv — posibil yield trap';
+      return `<div class="val-card" style="border-color:${dyColor}33;background:${dyColor}06;">
+        <div class="val-card-label">Dividend Info</div>
+        <div class="val-card-val" style="color:${dyColor}">${sym}${fmt(inputs.dividend)}<span style="font-size:10px;">/acț</span></div>
+        ${yieldPct ? `<div style="font-size:10px;color:${dyColor};margin-top:3px;font-weight:600">${yieldPct.toFixed(2)}% yield — ${dyLabel}</div>` : ''}
+        <div style="font-size:9px;color:rgba(255,255,255,0.3);margin-top:2px;">Dividend anual / acțiune</div>
+      </div>`;
+    })()}
     <div class="val-weighted-card">
       <div class="vm-label">Val. Medie Ponderată</div>
       <div class="vm-val">${fv(weighted)}</div>
@@ -557,7 +594,7 @@ export function initValuarePanel(currentPrice, currency, yahooSector, ticker, me
   }
 
   if (!panel.dataset.listenersAttached) {
-    ['sector','eps','pe','fcf','growth','wacc','tgr','assets','cash','debt','shares'].forEach(id => {
+    ['sector','eps','pe','fcf','growth','wacc','tgr','assets','cash','debt','shares','ltv','occupancy','dividend'].forEach(id => {
       const el = $(`val-${id}`);
       el?.addEventListener('input',  updateValuare);
       el?.addEventListener('change', updateValuare);
@@ -597,6 +634,8 @@ export function initValuarePanel(currentPrice, currency, yahooSector, ticker, me
     setValInput('cash',   d.cash,        0);
     setValInput('debt',   d.debt,        0);
     setValInput('growth', d.growth,      1);
+    if (d.dividendRate != null) setValInput('dividend', d.dividendRate, 2);
+    if (d.ltv          != null) setValInput('ltv',       d.ltv,        1);
 
     // PE: din Yahoo quote; daca lipseste, calculeaza din pret/EPS
     if (metaFundamentals.pe == null) {
