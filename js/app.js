@@ -6,7 +6,8 @@
 import { calcParams, simulate, calcStats, percentilesPerDay,
          adjustParams, NUM_SIMS, estimateGARCH, estimateNu } from './montecarlo.js';
 import { analyzeSentiment, fetchSectorData, fetchVIX }        from './sentiment.js';
-import { drawPriceHistory, destroyAll, destroyPeriodCharts }   from './charts.js';
+import { drawPriceHistory, destroyAll, destroyPeriodCharts,
+         drawSentiment }                                        from './charts.js';
 import { fetchStockData, fetchImpliedVolatility, blendSigma }  from './api.js';
 import { $, fmt, setStatus, showSection,
          setPillColor, renderSectorBadge, renderPeriod }       from './ui.js';
@@ -363,6 +364,14 @@ async function runSimulation() {
             cash:        getValNum('cash'),
             debt:        getValNum('debt'),
             shares:      getValNum('shares'),
+            ltv:         getValNum('ltv'),
+            occupancy:   getValNum('occupancy'),
+            dividend:    getValNum('dividend'),
+            divYield:    (() => {
+              const div = getValNum('dividend');
+              const p   = parseFloat($('val-current-price')?.dataset?.price) || 0;
+              return (div > 0 && p > 0) ? parseFloat((div / p * 100).toFixed(2)) : null;
+            })(),
             resultsHTML:        $('val-results-grid')?.innerHTML          || '',
             fundamentalComment: $('val-fundamental-comment')?.innerHTML  || '',
             // ── Scor AI ──────────────────────────────────
