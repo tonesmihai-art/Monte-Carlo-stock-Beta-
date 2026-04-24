@@ -476,7 +476,7 @@ function _yv(v) {
 
 // ── Yahoo quoteSummary — date fundamentale complete ───
 async function _fetchYahooFundamentals(ticker) {
-  const modules = 'financialData,defaultKeyStatistics,summaryDetail';
+  const modules = 'financialData,defaultKeyStatistics,summaryDetail,balanceSheetHistory,balanceSheetHistoryQuarterly';
   const summaryUrls = [
     `https://query1.finance.yahoo.com/v11/finance/quoteSummary/${ticker}?modules=${modules}&formatted=false`,
     `https://query2.finance.yahoo.com/v11/finance/quoteSummary/${ticker}?modules=${modules}&formatted=false`,
@@ -495,9 +495,11 @@ async function _fetchYahooFundamentals(ticker) {
         const r = json?.quoteSummary?.result?.[0];
         if (r) {
           const fd = r.financialData || {}, ks = r.defaultKeyStatistics || {}, sd = r.summaryDetail || {};
+          const bs  = r.balanceSheetHistory?.balanceSheetStatements?.[0] || {};
+          const bsQ = r.balanceSheetHistoryQuarterly?.balanceSheetStatements?.[0] || {};
           const sharesRaw = _yv(ks.sharesOutstanding);
           const fcfTotal  = _yv(fd.freeCashflow);
-          const totalAssets = _yv(fd.totalAssets);
+          const totalAssetsRaw = _yv(fd.totalAssets) ?? _yv(bs.totalAssets) ?? _yv(bsQ.totalAssets);
           const eps    = _yv(ks.trailingEps);
           const pe     = _yv(sd.trailingPE) ?? _yv(sd.forwardPE) ?? _yv(ks.trailingPE) ?? null;
           const growth = _yv(fd.earningsGrowth) != null ? _yv(fd.earningsGrowth) * 100
@@ -505,9 +507,8 @@ async function _fetchYahooFundamentals(ticker) {
           const dividendRate  = _yv(sd.dividendRate)  ?? null;
           const dividendYield = _yv(sd.dividendYield) != null ? _yv(sd.dividendYield) * 100 : null;
           const _debtV   = _yv(fd.totalDebt);
-          const _assetsV = _yv(fd.totalAssets) ?? _yv(totalAssets);
-          const ltv = (_debtV != null && _assetsV > 0) ? (_debtV / _assetsV) * 100 : null;
-          console.log(`[Proxy] ${ticker} — eps=${eps} pe=${pe} fcf=${fcfTotal} shares=${sharesRaw}`,
+          const ltv = (_debtV != null && totalAssetsRaw > 0) ? (_debtV / totalAssetsRaw) * 100 : null;
+          console.log(`[Proxy] ${ticker} — eps=${eps} pe=${pe} fcf=${fcfTotal} shares=${sharesRaw} totalAssets=${totalAssetsRaw}`,
             'ks.trailingEps=', ks.trailingEps, 'sd.trailingPE=', sd.trailingPE);
           if (eps != null || pe != null || fcfTotal != null) {
             return {
@@ -517,7 +518,7 @@ async function _fetchYahooFundamentals(ticker) {
               fcfPerShare: (fcfTotal != null && sharesRaw > 0) ? fcfTotal / sharesRaw : null,
               cash:        _yv(fd.totalCash)   != null ? _yv(fd.totalCash)   / 1e6 : null,
               debt:        _yv(fd.totalDebt)   != null ? _yv(fd.totalDebt)   / 1e6 : null,
-              totalAssets: _yv(fd.totalAssets) != null ? _yv(fd.totalAssets) / 1e6 : null,
+              totalAssets: totalAssetsRaw      != null ? totalAssetsRaw      / 1e6 : null,
             };
           }
         }
@@ -532,9 +533,11 @@ async function _fetchYahooFundamentals(ticker) {
         if (typeof json !== 'object') continue;
         const r = json?.quoteSummary?.result?.[0];
         if (!r) continue;
-        const fd = r.financialData        || {};
-        const ks = r.defaultKeyStatistics || {};
-        const sd = r.summaryDetail        || {};
+        const fd  = r.financialData        || {};
+        const ks  = r.defaultKeyStatistics || {};
+        const sd  = r.summaryDetail        || {};
+        const bs  = r.balanceSheetHistory?.balanceSheetStatements?.[0] || {};
+        const bsQ = r.balanceSheetHistoryQuarterly?.balanceSheetStatements?.[0] || {};
 
         const sharesRaw = _yv(ks.sharesOutstanding);
         const fcfTotal  = _yv(fd.freeCashflow);
@@ -547,7 +550,7 @@ async function _fetchYahooFundamentals(ticker) {
         const dividendRate  = _yv(sd.dividendRate)  ?? null;
         const dividendYield = _yv(sd.dividendYield) != null ? _yv(sd.dividendYield) * 100 : null;
         const _dV  = _yv(fd.totalDebt);
-        const _aV  = _yv(fd.totalAssets);
+        const _aV  = _yv(fd.totalAssets) ?? _yv(bs.totalAssets) ?? _yv(bsQ.totalAssets);
         const ltv  = (_dV != null && _aV > 0) ? (_dV / _aV) * 100 : null;
 
         if (eps != null || pe != null || fcfTotal != null) {
@@ -556,9 +559,9 @@ async function _fetchYahooFundamentals(ticker) {
             dividendRate, dividendYield, ltv,
             shares:      sharesRaw != null ? sharesRaw / 1e6 : null,
             fcfPerShare: fcfPS,
-            cash:        _yv(fd.totalCash)   != null ? _yv(fd.totalCash)   / 1e6 : null,
-            debt:        _yv(fd.totalDebt)   != null ? _yv(fd.totalDebt)   / 1e6 : null,
-            totalAssets: _yv(fd.totalAssets) != null ? _yv(fd.totalAssets) / 1e6 : null,
+            cash:        _yv(fd.totalCash) != null ? _yv(fd.totalCash) / 1e6 : null,
+            debt:        _yv(fd.totalDebt) != null ? _yv(fd.totalDebt) / 1e6 : null,
+            totalAssets: _aV              != null ? _aV              / 1e6 : null,
           };
         }
       } catch (_) {}
