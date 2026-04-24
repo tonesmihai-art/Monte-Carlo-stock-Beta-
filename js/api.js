@@ -318,16 +318,13 @@ async function _fetchFinnhub(ticker) {
   const shares = p?.shareOutstanding ?? null;
 
   // ── Bilant — Finnhub returneaza in milioane $ ────────
-  // Daca valorile par in miliarde (ex. VZ assets ~220 in loc de 220000)
-  // ele sunt deja in milioane; verifica prima data si ajusteaza scala mai jos
   const toM = v => (v != null && isFinite(v)) ? v : null;
 
-  const totalAssets = toM(m?.totalAssets);      // in milioane $
-  const cashFH        = toM(m?.cashAndEquivalents);
-  const debtFH        = toM(m?.totalDebt);
+  const totalAssets = toM(m?.totalAssets);
+  const cashFH      = toM(m?.cashAndEquivalents);
+  const debtFH      = toM(m?.totalDebt);
 
   return { eps, pe, fcfPerShare, growth, shares, totalAssets, cash: cashFH, debt: debtFH };
-
 }
 
 
@@ -429,7 +426,6 @@ async function _fetchSEC(ticker) {
     const urls = [
       `https://data.sec.gov/api/xbrl/companyconcept/CIK${cik}/us-gaap/${name}.json`,
       altName && `https://data.sec.gov/api/xbrl/companyconcept/CIK${cik}/us-gaap/${altName}.json`,
-      // namespace alternativ (ex. dei pt EntityCommonStockSharesOutstanding)
       altName && altNamespace
         && `https://data.sec.gov/api/xbrl/companyconcept/CIK${cik}/${altNamespace}/${altName}.json`,
       `https://data.sec.gov/api/xbrl/companyconcept/CIK${cik}/ifrs-full/${name}.json`,
@@ -437,7 +433,7 @@ async function _fetchSEC(ticker) {
 
     for (const url of urls) {
       try {
-        const json = await _robustGet(url, 12000);  // 12s — fișiere mari pt companii mari (VZ, MSFT)
+        const json = await _robustGet(url, 12000);
         const val  = _secLatest(json, unit);
         if (val != null) return val;
       } catch (_) {}
@@ -465,7 +461,7 @@ async function _fetchSEC(ticker) {
     cash:        cash      != null ? cash      / 1e6 : null,
     debt:        debt      != null ? debt      / 1e6 : null,
     shares:      rawShares != null ? rawShares / 1e6 : null,
-    fcfTotal:    fcf       != null ? fcf       / 1e6 : null,   // FCF total in milioane $
+    fcfTotal:    fcf       != null ? fcf       / 1e6 : null,
     fcfPerShare: (fcf != null && rawShares > 0) ? fcf / rawShares : null,
     eps,
   };
@@ -480,19 +476,15 @@ function _yv(v) {
 
 // ── Yahoo quoteSummary — date fundamentale complete ───
 async function _fetchYahooFundamentals(ticker) {
-  // Pas 1: quoteSummary — cel mai complet (FCF, cash, debt, PE, growth, EPS)
   const modules = 'financialData,defaultKeyStatistics,summaryDetail';
   const summaryUrls = [
-    // v11 — mai nou, uneori nu necesita crumb
     `https://query1.finance.yahoo.com/v11/finance/quoteSummary/${ticker}?modules=${modules}&formatted=false`,
     `https://query2.finance.yahoo.com/v11/finance/quoteSummary/${ticker}?modules=${modules}&formatted=false`,
-    // v10 — necesita crumb de obicei, dar incercam
     `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=${modules}&formatted=false`,
     `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=${modules}&formatted=false`,
     `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=${modules}`,
     `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=${modules}`,
   ];
-  // Daca MY_PROXY e setat, incearca-l primul cu timeout mare (Render poate dormi 30s)
   if (MY_PROXY) {
     const proxyUrl = `${MY_PROXY}/proxy?url=${encodeURIComponent(
       `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=${modules}&formatted=false`
@@ -536,7 +528,7 @@ async function _fetchYahooFundamentals(ticker) {
   for (const url of summaryUrls) {
     for (const px of _getProxies()) {
       try {
-        const json = await _yGet(px(url), 3000);  // timeout scurt — v10 necesita crumb
+        const json = await _yGet(px(url), 3000);
         if (typeof json !== 'object') continue;
         const r = json?.quoteSummary?.result?.[0];
         if (!r) continue;
@@ -558,12 +550,9 @@ async function _fetchYahooFundamentals(ticker) {
         const _aV  = _yv(fd.totalAssets);
         const ltv  = (_dV != null && _aV > 0) ? (_dV / _aV) * 100 : null;
 
-        // returnam doar daca avem cel putin un camp util
         if (eps != null || pe != null || fcfTotal != null) {
           return {
-            eps,
-            pe,
-            growth,
+            eps, pe, growth,
             dividendRate, dividendYield, ltv,
             shares:      sharesRaw != null ? sharesRaw / 1e6 : null,
             fcfPerShare: fcfPS,
@@ -606,82 +595,72 @@ async function _fetchYahooFundamentals(ticker) {
 
 export async function fetchValuationFundamentals(ticker) {
   const isUS = !ticker.includes('.') && !ticker.includes('-');
-  const isEU = !isUS;   // orice ticker cu sufix = actiune europeana / internationala
 
   // ── Lansam toate sursele in paralel ───────────────────
-  // Ordinea de prioritate: Finnhub >  SEC (US only) > Yahoo
+  // Ordinea de prioritate: Finnhub > SEC (US only) > Yahoo
   const tasks = [
-    _fetchFinnhub(ticker),                                         // Finnhub — primar (US + EU cu conversie ticker)
-     isUS ? _fetchSEC(ticker) : Promise.resolve({}),                // SEC EDGAR — US only
-    _fetchYahooFundamentals(ticker),                               // Yahoo — fallback general
+    _fetchFinnhub(ticker),
+    isUS ? _fetchSEC(ticker) : Promise.resolve({}),
+    _fetchYahooFundamentals(ticker),
   ];
-  const [fhR,  secR, quoteR] = await Promise.allSettled(tasks);
+  const [fhR, secR, quoteR] = await Promise.allSettled(tasks);
 
   const fh    = fhR.status    === 'fulfilled' ? fhR.value    : {};
   const sec   = secR.status   === 'fulfilled' ? secR.value   : {};
   const quote = quoteR.status === 'fulfilled' ? quoteR.value : {};
 
   // ── Merge: Finnhub > SEC > Yahoo (primul non-null castiga) ──
-  const eps    = fh.eps    ??  sec.eps    ?? quote.eps    ?? null;
-  const pe     = fh.pe     ??  quote.pe                  ?? null;
-  const shares = fh.shares ??  sec.shares ?? quote.shares ?? null;
-  let growth = fh.growth ??  quote.growth               ?? null;
-  //const assets = fh.totalAssets ??  sec.totalAssets ?? quote.totalAssets ?? null;
-  //const cash   = fh.cash        ??  sec.cash        ?? quote.cash        ?? null;
-  //const debt   = fh.debt        ??  sec.debt        ?? quote.debt        ?? null;
+  const eps    = fh.eps    ?? sec.eps    ?? quote.eps    ?? null;
+  const pe     = fh.pe     ?? quote.pe                  ?? null;
+  const shares = fh.shares ?? sec.shares ?? quote.shares ?? null;
+  let growth   = fh.growth ?? quote.growth               ?? null;
 
-  // --- PATCH: corectare growth Yahoo --- //
-  let growthFixed = growth;
-  // Dacă Yahoo trimite earningsGrowth în loc de FCF growth
-  if (growthFixed == null && quote.earningsGrowth != null) {
-    growthFixed = quote.earningsGrowth * 100;
+  // --- PATCH: corectare growth --- //
+  if (growth != null) {
+    if (growth > 35)  growth = 35;   // cap rezonabil pentru DCF
+    if (growth < -15) growth = 0;    // nu folosim scadere drastica
   }
-  // Dacă FCF este negativ sau lipsă → growth = 0
-  if ( fh.fcfPerShare <= 0 || quote.fcfPerShare <= 0) {
-    growthFixed = 0;
+  // FCF negativ → growth 0, dar DOAR dacă avem valori concrete (nu null)
+  if ((fh.fcfPerShare != null && fh.fcfPerShare <= 0) ||
+      (quote.fcfPerShare != null && quote.fcfPerShare <= 0)) {
+    growth = 0;
   }
-  // Limite de siguranță (Yahoo trimite uneori valori aberante)
-  if (growthFixed > 20) growthFixed = 3;   // maxim 3% dacă Yahoo dă 428%
-  if (growthFixed < -10) growthFixed = 0;  // nu folosim creștere negativă mare
-  // Suprascriem growth-ul final
-  growth = growthFixed;
   // --- END PATCH --- //
 
-  // FCF per share: Finnhub direct,  sau calcul din fcfTotal SEC + shares disponibil
-  let fcfPerShare = fh.fcfPerShare ??  sec.fcfPerShare ?? quote.fcfPerShare ?? null;
+  // FCF per share: Finnhub direct, sau calcul din fcfTotal SEC + shares disponibil
+  let fcfPerShare = fh.fcfPerShare ?? sec.fcfPerShare ?? quote.fcfPerShare ?? null;
   if (fcfPerShare == null && sec.fcfTotal != null && shares != null && shares > 0) {
-    fcfPerShare = sec.fcfTotal / shares;   // ($M) / (M shares) = $/share
+    fcfPerShare = sec.fcfTotal / shares;
   }
 
-  // Bilant: Finnhub >  SEC > Yahoo
-  const totalAssets = fh.totalAssets ??  sec.totalAssets                    ?? null;
-  const cash        = fh.cash        ??  sec.cash  ?? quote.cash            ?? null;
-  const debt        = fh.debt        ??  sec.debt  ?? quote.debt            ?? null;
+  // Bilant: Finnhub > SEC > Yahoo
+  const totalAssets = fh.totalAssets ?? sec.totalAssets                   ?? null;
+  const cash        = fh.cash        ?? sec.cash  ?? quote.cash           ?? null;
+  const debt        = fh.debt        ?? sec.debt  ?? quote.debt           ?? null;
 
   // ── Dividend + LTV — Yahoo sursa principala ──────────
   const dividendRate  = quote.dividendRate  ?? null;
   const dividendYield = quote.dividendYield ?? null;
-  // LTV: calculeaza din debt/assets daca disponibile; altfel din Yahoo direct
   const ltvCalc = (debt != null && totalAssets != null && totalAssets > 0)
     ? (debt / totalAssets) * 100 : null;
   const ltv = quote.ltv ?? ltvCalc ?? null;
 
   // ── Sursa per camp (pentru afisare in UI) ─────────────
-  const src4 = (fhV,  secV, quoteV) =>
+  const src3 = (fhV, secV, quoteV) =>
     fhV    != null ? 'Finnhub'
   : secV   != null ? 'SEC'
   : quoteV != null ? 'Yahoo'
   : null;
 
   const sources = {
-    eps:      src4(fh.eps,    sec.eps,    quote.eps),
-    pe:       src4(fh.pe,     null,       quote.pe),
-    fcf:      src4(fh.fcfPerShare,  sec.fcfPerShare, quote.fcfPerShare) ?? (sec.fcfTotal != null ? 'SEC calc' : null),
-    growth:   src4(fh.growth,  null,       quote.growth),
-    shares:   src4(fh.shares,  sec.shares, quote.shares),
-    assets:   src4(fh.totalAssets,  sec.totalAssets, quote.totalAssets),
-    cash:     src4(fh.cash,   sec.cash,   quote.cash),
-    debt:     src4(fh.debt,   sec.debt,   quote.debt),
+    eps:      src3(fh.eps,         sec.eps,         quote.eps),
+    pe:       src3(fh.pe,          null,            quote.pe),
+    fcf:      src3(fh.fcfPerShare, sec.fcfPerShare, quote.fcfPerShare) ?? (sec.fcfTotal != null ? 'SEC calc' : null),
+    growth:   src3(fh.growth,      null,            quote.growth),
+    shares:   src3(fh.shares,      sec.shares,      quote.shares),
+    assets:   src3(fh.totalAssets, sec.totalAssets, null),
+    cash:     src3(fh.cash,        sec.cash,        quote.cash),
+    debt:     src3(fh.debt,        sec.debt,        quote.debt),
     dividend: dividendRate != null ? 'Yahoo' : null,
   };
 
