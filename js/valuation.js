@@ -194,19 +194,10 @@ export function updateValuare() {
                      : yieldPct < 10  ? 'Ridicat — verifică sustenabilitatea'
                      :                  'Excesiv — posibil yield trap';
       if (!hasDiv) {
-        return `<div class="val-method-card val-div-no-dividend" style="
-          opacity:0.22;
-          filter:blur(0.8px);
-          pointer-events:none;
-          user-select:none;
-          border-color:rgba(136,136,136,0.15);
-          background:rgba(136,136,136,0.03);
-          position:relative;
-        ">
-          <div class="vm-label" style="color:rgba(255,255,255,0.3);">Dividend Info</div>
-          <div class="vm-val" style="color:rgba(255,255,255,0.25);">—</div>
-          <div style="font-size:10px;color:rgba(255,255,255,0.2);margin-top:3px;">Nu plătește dividend</div>
-          <div style="font-size:9px;color:rgba(255,255,255,0.15);margin-top:2px;">Dividend anual / acțiune</div>
+        return `<div class="val-method-card" style="opacity:0.45;border-color:rgba(136,136,136,0.18);background:rgba(136,136,136,0.04);">
+          <div class="vm-label" style="color:rgba(255,255,255,0.35);">Dividend Info</div>
+          <div class="vm-val" style="color:rgba(255,255,255,0.28);font-size:13px;">Fără dividend</div>
+          <div class="vm-weight" style="color:rgba(255,255,255,0.18);">—</div>
         </div>`;
       }
       return `<div class="val-method-card" style="border-color:${dyColor}33;background:${dyColor}06;">
