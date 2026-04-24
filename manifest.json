@@ -1,6 +1,6 @@
 {
-  "name": "Monte Carlo Stocks",
-  "short_name": "MC Stocks",
+  "name": "Monte Carlo Stocks-beta",
+  "short_name": "MC Stocks-beta",
   "description": "Simulare Monte Carlo pentru actiuni cu analiza sentiment",
   "start_url": "./index.html",
   "display": "standalone",
