@@ -37,7 +37,7 @@ export const YAHOO_TO_VAL_SECTOR = {
 
 // ── Calcul valuare — 4 metode ─────────────────────────
 
-function calcValuare({ eps, pe, fcf, growth, wacc, tgr, assets, cash, debt, shares, sector, dividend }) {
+function calcValuare({ eps, pe, fcf, growth, wacc, tgr, assets, cash, debt, shares, sector }) {
   const w = VAL_SECTOR_WEIGHTS[sector] || VAL_SECTOR_WEIGHTS.tech;
 
   const valEPS = (eps > 0 && pe > 0) ? eps * pe : null;
@@ -45,12 +45,6 @@ function calcValuare({ eps, pe, fcf, growth, wacc, tgr, assets, cash, debt, shar
   const valNAV = (assets != null && cash != null && debt != null && shares > 0)
     ? (assets + cash - debt) / shares
     : null;
-  // DDM (Gordon Growth) — folosit cu pondere ridicata pentru REIT
-  let valDDM = null;
-  if (dividend > 0 && wacc != null && tgr != null && wacc > tgr) {
-    const r = wacc / 100, g = tgr / 100;
-    valDDM = dividend / (r - g);
-  }
 
   let valDCF = null;
   let growthCapped = false;
@@ -69,14 +63,9 @@ function calcValuare({ eps, pe, fcf, growth, wacc, tgr, assets, cash, debt, shar
     valDCF = dcfSum + terminalPV;
   }
 
-  const wDDM = sector === 'reit' ? 0.35 : 0.05;  // REIT: DDM are pondere mare
-  const wDCF = sector === 'reit' ? (w.dcf * 0.5) : w.dcf;  // DCF mai mic pt REIT
   const methods = [
-    { val: valEPS, w: w.eps },
-    { val: valFCF, w: w.fcf },
-    { val: valNAV, w: w.nav },
-    { val: valDCF, w: wDCF  },
-    { val: valDDM, w: wDDM  },
+    { val: valEPS, w: w.eps }, { val: valFCF, w: w.fcf },
+    { val: valNAV, w: w.nav }, { val: valDCF, w: w.dcf },
   ];
   const avail = methods.filter(m => m.val != null && isFinite(m.val));
   let weighted = null;
@@ -84,7 +73,7 @@ function calcValuare({ eps, pe, fcf, growth, wacc, tgr, assets, cash, debt, shar
     const totalW = avail.reduce((s, m) => s + m.w, 0);
     weighted = avail.reduce((s, m) => s + m.val * m.w / totalW, 0);
   }
-  return { valEPS, valFCF, valNAV, valDCF, valDDM, weighted, w, growthCapped };
+  return { valEPS, valFCF, valNAV, valDCF, weighted, w, growthCapped };
 }
 
 // ── Actualizeaza UI dupa orice modificare input ───────
@@ -105,15 +94,8 @@ export function updateValuare() {
     growth: getNum('growth'), wacc: getNum('wacc'), tgr: getNum('tgr'),
     assets: getNum('assets'), cash: getNum('cash'), debt: getNum('debt'),
     shares: getNum('shares'),
-    dividend:   getNum('dividend'),
-    ltv:        getNum('ltv'),
-    occupancy:  getNum('occupancy'),
   };
-  // Arata/ascunde campurile REIT
-  const reitBlock = document.getElementById('val-reit-block');
-  if (reitBlock) reitBlock.style.display = sector === 'reit' ? 'contents' : 'none';
-
-  const { valEPS, valFCF, valNAV, valDCF, valDDM, weighted, w, growthCapped } = calcValuare({ ...inputs, sector });
+  const { valEPS, valFCF, valNAV, valDCF, weighted, w, growthCapped } = calcValuare({ ...inputs, sector });
 
   function fv(v) { return v != null ? `${sym}${v.toFixed(2)}` : '—'; }
 
@@ -170,26 +152,11 @@ export function updateValuare() {
     commentEl.style.display = 'block';
   }
 
-  const formulaDDM = inputs.dividend > 0 && inputs.wacc != null && inputs.tgr != null
-    ? `D ${sym}${inputs.dividend.toFixed(2)} / (WACC ${inputs.wacc}% − g ${inputs.tgr}%) = ${fv(valDDM)}`
-    : 'Necesita Dividend/acț, WACC, rată terminală';
-
-  const reitInfoHtml = sector === 'reit' ? `
-    <div class="val-reit-info">
-      ${inputs.ltv != null ? `<span class="reit-badge" style="color:${inputs.ltv < 30 ? '#66bb6a' : inputs.ltv < 40 ? '#ffee58' : inputs.ltv < 50 ? '#ffa726' : '#ef5350'}">
-        LTV ${inputs.ltv.toFixed(1)}% ${inputs.ltv < 30 ? '✔ Excelent' : inputs.ltv < 40 ? '✓ Bun' : inputs.ltv < 50 ? '⚠ Prudență' : '✘ Risc ridicat'}</span>` : ''}
-      ${inputs.occupancy != null ? `<span class="reit-badge" style="color:${inputs.occupancy > 95 ? '#66bb6a' : inputs.occupancy > 90 ? '#ffee58' : inputs.occupancy > 85 ? '#ffa726' : '#ef5350'}">
-        Ocupare ${inputs.occupancy.toFixed(1)}% ${inputs.occupancy > 95 ? '✔ Excelent' : inputs.occupancy > 90 ? '✓ Bun' : inputs.occupancy > 85 ? '⚠ Atenție' : '✘ Slab'}</span>` : ''}
-      ${inputs.dividend != null ? `<span class="reit-badge" style="color:#4fc3f7">Dividend ${sym}${inputs.dividend.toFixed(2)}/acț</span>` : ''}
-    </div>` : '';
-
   grid.innerHTML = `
-    ${reitInfoHtml}
     ${card('Val. PE',  valEPS, formulaEPS, w.eps)}
     ${card('Val. FCF', valFCF, formulaFCF, w.fcf)}
     ${card('Val. NAV', valNAV, formulaNAV, w.nav)}
     ${card('Val. DCF', valDCF, formulaDCF, w.dcf)}
-    ${sector === 'reit' ? card('Val. DDM', valDDM, formulaDDM, 0.35) : ''}
     <div class="val-weighted-card">
       <div class="vm-label">Val. Medie Ponderată</div>
       <div class="vm-val">${fv(weighted)}</div>
@@ -197,6 +164,176 @@ export function updateValuare() {
     </div>
     ${marginHtml}`;
 }
+
+// ── Validare AI prin proxy ────────────────────────────
+
+const MY_PROXY_VAL = 'https://monte-carlo-proxy.onrender.com';
+
+export async function validateFundamentalsAI(ticker, sector, currency, currentPrice) {
+  const getNum = id => { const v = parseFloat($(`val-${id}`)?.value); return isNaN(v) ? null : v; };
+  const fields = {
+    eps:       getNum('eps'),
+    pe:        getNum('pe'),
+    fcf:       getNum('fcf'),
+    growth:    getNum('growth'),
+    wacc:      getNum('wacc'),
+    assets:    getNum('assets'),
+    cash:      getNum('cash'),
+    debt:      getNum('debt'),
+    shares:    getNum('shares'),
+    ltv:       getNum('ltv'),
+    occupancy: getNum('occupancy'),
+    dividend:  getNum('dividend'),
+  };
+
+  const resp = await fetch(`${MY_PROXY_VAL}/validate-fundamentals`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ ticker, sector, currency, currentPrice, fields }),
+  });
+  if (!resp.ok) throw new Error(`Proxy error ${resp.status}`);
+  return resp.json();
+}
+
+// ── Aplica corectiile AI si afiseaza panelul de diff ──
+
+// Stocheaza ultimul rezultat AI pentru butonul de aplicare
+let _lastAIResult = null;
+let _lastAICurrency = null;
+
+export function applyAIValidation(result, currency) {
+  _lastAIResult   = result;
+  _lastAICurrency = currency;
+
+  const sym    = currency === 'USD' ? '$' : currency + ' ';
+  const getNum = id => { const v = parseFloat($(`val-${id}`)?.value); return isNaN(v) ? null : v; };
+  const fmtV   = (v, id) => {
+    const dec = ['assets','cash','debt','shares'].includes(id) ? 0
+              : ['growth','wacc','tgr','ltv','occupancy'].includes(id) ? 1 : 2;
+    return v != null ? v.toFixed(dec) : '—';
+  };
+
+  const LABELS = {
+    eps:'EPS', pe:'P/E', fcf:'FCF/acț', growth:'Creștere %',
+    wacc:'WACC %', assets:'Active M', cash:'Cash M', debt:'Datorii M',
+    ltv:'LTV %', dividend:'Dividend', shares:'Acțiuni M',
+  };
+
+  const corrections = result.corrections || {};
+  const rows = Object.entries(corrections)
+    .filter(([, v]) => v != null)
+    .map(([id, corrected]) => {
+      const original = getNum(id);
+      return { id, label: LABELS[id] || id, original, corrected };
+    });
+
+  const isValid = result.valid !== false;
+  const hasCorr = rows.length > 0;
+  const vcColor = isValid && !hasCorr ? '#66bb6a' : hasCorr ? '#ffa726' : '#ef5350';
+  const vcIcon  = isValid && !hasCorr ? '✔' : hasCorr ? '⚠' : '✘';
+
+  const diffRows = rows.map(({ label, original, id, corrected }) => `
+    <tr>
+      <td style="color:rgba(255,255,255,0.45);padding:3px 8px 3px 0;font-size:10.5px;">${label}</td>
+      <td style="color:#ef9a9a;text-decoration:line-through;padding:3px 8px;font-size:10.5px;white-space:nowrap;">
+        ${original != null ? fmtV(original, id) : '—'}
+      </td>
+      <td style="color:#a5d6a7;font-weight:600;padding:3px 0;font-size:10.5px;white-space:nowrap;">
+        → ${fmtV(corrected, id)}
+      </td>
+    </tr>`).join('');
+
+  const issuesList = (result.issues || []).map(i =>
+    `<div style="font-size:10px;color:rgba(255,167,38,0.8);margin-top:2px;">• ${i}</div>`
+  ).join('');
+
+  const applyBtnHtml = hasCorr ? `
+    <button id="val-ai-apply-btn" onclick="window._applyAICorrections()"
+      style="margin-top:10px;padding:5px 14px;border-radius:14px;border:1px solid rgba(255,167,38,0.5);
+             background:rgba(255,167,38,0.1);color:#ffa726;font-size:10.5px;font-weight:700;
+             cursor:pointer;letter-spacing:0.3px;">
+      ✦ Aplică corecțiile AI
+    </button>` : '';
+
+  let el = document.getElementById('val-ai-validation');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'val-ai-validation';
+    const grid = document.getElementById('val-results-grid');
+    grid?.parentNode?.insertBefore(el, grid);
+  }
+
+  el.innerHTML = `
+    <div style="margin-bottom:12px;padding:10px 13px;
+                background:${vcColor}08;border:1px solid ${vcColor}33;border-radius:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;
+                  margin-bottom:${hasCorr || issuesList ? '8px' : '0'};">
+        <span style="font-size:11px;font-weight:700;color:${vcColor};">
+          ${vcIcon} AI Validator — ${result.verdict || 'Verificat'}
+        </span>
+        <span style="font-size:9px;color:rgba(255,255,255,0.25);">claude-haiku · câmpurile rămân editabile</span>
+      </div>
+      ${hasCorr ? `
+        <table style="border-collapse:collapse;width:auto;">
+          <thead><tr>
+            <th style="font-size:9px;color:rgba(255,255,255,0.3);font-weight:600;padding:0 8px 4px 0;text-align:left;">Câmp</th>
+            <th style="font-size:9px;color:rgba(255,255,255,0.3);font-weight:600;padding:0 8px 4px;text-align:left;">Inițial (Yahoo)</th>
+            <th style="font-size:9px;color:rgba(255,255,255,0.3);font-weight:600;padding:0 0 4px;text-align:left;">Sugerat AI</th>
+          </tr></thead>
+          <tbody>${diffRows}</tbody>
+        </table>
+        ${applyBtnHtml}` : '<div style="font-size:10.5px;color:rgba(255,255,255,0.4);">Toate valorile par corecte.</div>'}
+      ${issuesList}
+    </div>`;
+}
+
+// Aplica efectiv corectiile AI in campuri — pastreaza editabilitatea
+window._applyAICorrections = function () {
+  if (!_lastAIResult) return;
+  const corrections = _lastAIResult.corrections || {};
+  Object.entries(corrections).forEach(([id, corrected]) => {
+    if (corrected == null) return;
+    const dec = ['assets','cash','debt','shares'].includes(id) ? 0
+              : ['growth','wacc','tgr','ltv','occupancy'].includes(id) ? 1 : 2;
+    setValInput(id, corrected, dec);
+  });
+  // Feedback vizual pe buton
+  const btn = document.getElementById('val-ai-apply-btn');
+  if (btn) {
+    btn.textContent = '✓ Aplicat — poți modifica în continuare';
+    btn.style.color = '#a5d6a7';
+    btn.style.borderColor = 'rgba(102,187,106,0.5)';
+    btn.style.background  = 'rgba(102,187,106,0.08)';
+    btn.disabled = true;
+  }
+  updateValuare();
+};
+
+// ── Handler buton Validare AI (apelat din HTML onclick) ──
+window._runAIValidation = async function () {
+  const btn = document.getElementById('val-ai-validate-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Validare AI...'; }
+
+  const _sector   = $('val-sector')?.value || 'tech';
+  const _priceEl  = $('val-current-price');
+  const _price    = _priceEl ? parseFloat(_priceEl.dataset.price) : 0;
+  const _currency = _priceEl ? (_priceEl.dataset.currency || 'USD') : 'USD';
+  const _ticker   = document.getElementById('stock-ticker')?.textContent?.trim() || '';
+
+  try {
+    const result = await validateFundamentalsAI(_ticker, _sector, _currency, _price);
+    applyAIValidation(result, _currency);
+  } catch (err) {
+    console.warn('[AI validation]', err.message);
+    let el = document.getElementById('val-ai-validation');
+    if (!el) { el = document.createElement('div'); el.id = 'val-ai-validation';
+      document.getElementById('val-results-grid')?.parentNode?.insertBefore(el, document.getElementById('val-results-grid')); }
+    el.innerHTML = `<div style="padding:8px 12px;border:1px solid rgba(239,83,80,0.3);border-radius:8px;
+      font-size:10.5px;color:rgba(239,83,80,0.7);">⚠ AI validator indisponibil — ${err.message}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🤖 Validare AI'; }
+  }
+};
 
 window.toggleValuare = function () {
   const content = $('val-content');
@@ -214,9 +351,9 @@ let _techCtx = {};
 let _lastAIScore = null;
 export function getLastAIScore() { return _lastAIScore; }
 
-function calcAIScore(margin, deviationPct, reitMetrics) {
+function calcAIScore(margin, deviationPct) {
   // Fund score din marja de siguranta fundamentala
-  let fundScore = 50;
+  let fundScore = 50; // neutral daca nu avem date
   if (margin != null) {
     if      (margin > 30)  fundScore = 88;
     else if (margin > 20)  fundScore = 75;
@@ -226,22 +363,8 @@ function calcAIScore(margin, deviationPct, reitMetrics) {
     else if (margin > -20) fundScore = 25;
     else                   fundScore = 12;
   }
-
-  // REIT: ajusteaza fundScore cu LTV + ocupare
-  if (reitMetrics) {
-    const { ltv, occupancy } = reitMetrics;
-    let reitAdj = 0;
-    if (ltv != null) {
-      reitAdj += ltv < 30 ? +8 : ltv < 40 ? +3 : ltv < 50 ? -5 : -15;
-    }
-    if (occupancy != null) {
-      reitAdj += occupancy > 95 ? +8 : occupancy > 90 ? +3 : occupancy > 85 ? -4 : -12;
-    }
-    fundScore = Math.max(0, Math.min(100, fundScore + reitAdj));
-  }
-
   // Tech score din deviatia fata de MA60 (negativ = sub MA = bun)
-  let techScore = 50;
+  let techScore = 50; // neutral daca nu avem date
   if (deviationPct != null) {
     if      (deviationPct < -15) techScore = 90;
     else if (deviationPct <  -5) techScore = 72;
@@ -274,17 +397,8 @@ function generateFundamentalComment(weighted, curPrice, margin, sym) {
   const { deviationPct, drift, sigma, mean50 } = _techCtx;
   const hasTech = deviationPct != null;
 
-  // ── REIT metrics pentru scoring ──────────────────────
-  const getNum = id => { const v = parseFloat($(`val-${id}`)?.value); return isNaN(v) ? null : v; };
-  const sector = $('val-sector')?.value || 'tech';
-  const reitMetrics = sector === 'reit' ? {
-    ltv:       getNum('ltv'),
-    occupancy: getNum('occupancy'),
-    dividend:  getNum('dividend'),
-  } : null;
-
   // ── Scor AI ──────────────────────────────────────────
-  const ai = calcAIScore(margin, hasTech ? deviationPct : null, reitMetrics);
+  const ai = calcAIScore(margin, hasTech ? deviationPct : null);
   _lastAIScore = ai;
   const vc = ai.verdict === 'BUY' ? '#66bb6a' : ai.verdict === 'HOLD' ? '#ffee58' : '#ef5350';
   const scoreBadgeHtml = `
@@ -381,55 +495,6 @@ function generateFundamentalComment(weighted, curPrice, margin, sym) {
       </div>`;
   }
 
-  // ── Bloc REIT ────────────────────────────────────────
-  let reitHtml = '';
-  if (reitMetrics) {
-    const { ltv, occupancy, dividend } = reitMetrics;
-    const rows = [];
-
-    if (ltv != null) {
-      const lc = ltv < 30 ? '#66bb6a' : ltv < 40 ? '#ffee58' : ltv < 50 ? '#ffa726' : '#ef5350';
-      const lt = ltv < 30 ? 'Excelent — finanțare conservatoare, rezistă la creșteri de dobânzi'
-               : ltv < 40 ? 'Bun — risc moderat, în linie cu industria REIT'
-               : ltv < 50 ? 'Prudență — îndatorare ridicată, sensibil la ratele dobânzilor'
-               :             'Risc ridicat — LTV > 50% crește vulnerabilitatea la refinanțare';
-      rows.push(`<div class="vfc-row" style="margin-top:6px">
-        <span style="color:${lc};font-weight:600">LTV ${ltv.toFixed(1)}% — ${lt}</span>
-      </div>`);
-    }
-
-    if (occupancy != null) {
-      const oc = occupancy > 95 ? '#66bb6a' : occupancy > 90 ? '#ffee58' : occupancy > 85 ? '#ffa726' : '#ef5350';
-      const ot = occupancy > 95 ? 'Ocupare excelentă — flux de numerar stabil și predictibil'
-               : occupancy > 90 ? 'Ocupare bună — risc de venit redus'
-               : occupancy > 85 ? 'Ocupare medie — urmărește tendința de îmbunătățire'
-               :                   'Ocupare slabă — risc semnificativ asupra dividendului';
-      rows.push(`<div class="vfc-row">
-        <span style="color:${oc};font-weight:600">Rata ocupare ${occupancy.toFixed(1)}% — ${ot}</span>
-      </div>`);
-    }
-
-    if (dividend != null && curPrice > 0) {
-      const yieldPct = (dividend / curPrice) * 100;
-      const dc = yieldPct < 3 ? '#ffee58' : yieldPct < 8 ? '#66bb6a' : yieldPct < 12 ? '#ffa726' : '#ef5350';
-      const dt = yieldPct < 3  ? 'Dividend modest — potențial de creștere, dar randament scăzut'
-               : yieldPct < 8  ? 'Randament atractiv — tipic pentru un REIT sănătos'
-               : yieldPct < 12 ? 'Randament foarte ridicat — verifică sustenabilitatea dividendului'
-               :                  'Randament excesiv — posibil dividend nesustenabil (yield trap)';
-      rows.push(`<div class="vfc-row">
-        <span style="color:${dc};font-weight:600">Dividend yield ${yieldPct.toFixed(2)}% — ${dt}</span>
-      </div>`);
-    }
-
-    if (rows.length > 0) {
-      reitHtml = `
-        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.07)">
-          <div class="vfc-title" style="margin-bottom:4px">🏢 Analiză REIT</div>
-          ${rows.join('')}
-        </div>`;
-    }
-  }
-
   return `
     ${scoreBadgeHtml}
     <div class="vfc-title">📋 Analiză Fundamentală + Timing Tehnic</div>
@@ -437,7 +502,6 @@ function generateFundamentalComment(weighted, curPrice, margin, sym) {
       <span style="color:${fundColor};font-weight:600">${fundLabel}</span>
     </div>
     <div class="vfc-row" style="color:rgba(255,255,255,0.8)">${fundAdvice}</div>
-    ${reitHtml}
     ${techHtml}`;
 }
 
@@ -480,23 +544,23 @@ export function initValuarePanel(currentPrice, currency, yahooSector, ticker, me
   priceEl.dataset.price    = currentPrice;
   priceEl.dataset.currency = currency || 'USD';
 
+  // Populeaza si val-current-price pentru AI validator
+  const valPriceEl = $('val-current-price');
+  if (valPriceEl) {
+    valPriceEl.dataset.price    = currentPrice;
+    valPriceEl.dataset.currency = currency || 'USD';
+  }
+
   if (yahooSector && YAHOO_TO_VAL_SECTOR[yahooSector]) {
     const sel = $('val-sector');
     if (sel) sel.value = YAHOO_TO_VAL_SECTOR[yahooSector];
   }
 
   if (!panel.dataset.listenersAttached) {
-    ['sector','eps','pe','fcf','growth','wacc','tgr','assets','cash','debt','shares',
-     'ltv','occupancy','dividend'].forEach(id => {
+    ['sector','eps','pe','fcf','growth','wacc','tgr','assets','cash','debt','shares'].forEach(id => {
       const el = $(`val-${id}`);
       el?.addEventListener('input',  updateValuare);
       el?.addEventListener('change', updateValuare);
-    });
-    // Sector change: arata/ascunde campuri REIT imediat
-    $('val-sector')?.addEventListener('change', () => {
-      const isReit = $('val-sector').value === 'reit';
-      const reitBlock = document.getElementById('val-reit-block');
-      if (reitBlock) reitBlock.style.display = isReit ? 'contents' : 'none';
     });
     panel.dataset.listenersAttached = '1';
   }
@@ -555,13 +619,13 @@ export function initValuarePanel(currentPrice, currency, yahooSector, ticker, me
     const srcStr = Object.entries(srcGroups)
       .map(([src, fields]) => `${src}: ${fields.join(', ')}`)
       .join(' · ');
-    // ── REIT: populeaza dividend + LTV daca disponibile ──
-    if (d.dividendRate != null)  setValInput('dividend', d.dividendRate, 2);
-    if (d.ltv          != null)  setValInput('ltv',       d.ltv,        1);
-
     statusEl.textContent = `✔ ${srcStr || 'Date disponibile'} · WACC, TGR — completează manual`;
     statusEl.style.color = 'rgba(102,187,106,0.65)';
     updateValuare();
+
+    // Arata butonul de validare AI dupa ce datele sunt incarcate
+    const aiBtnEl = $('val-ai-validate-btn');
+    if (aiBtnEl) aiBtnEl.style.display = 'inline-flex';
   }).catch(err => {
     const msg = metaPopulated > 0
       ? '⚠ FCF/cash/datorii indisponibile — completează manual'
