@@ -367,6 +367,22 @@ export function renderWatchlist() {
       </div>
       ${e.comment ? `<div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,0.45);line-height:1.55;">${e.comment}</div>` : ''}
       ${(() => {
+        // Dividend badge — toate sectoarele
+        const vf = e.valFundamentals;
+        const sym2 = e.currency === 'USD' ? '$' : e.currency + ' ';
+        if (vf?.dividend > 0) {
+          const yld = vf.divYield ?? (e.currentPrice > 0 ? (vf.dividend / e.currentPrice * 100) : null);
+          const dc = !yld ? '#4fc3f7' : yld < 2 ? '#ffee58' : yld < 6 ? '#66bb6a' : yld < 10 ? '#ffa726' : '#ef5350';
+          return `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;">
+            <span style="font-size:9.5px;color:rgba(255,255,255,0.3);">💰 Dividend</span>
+            <span style="font-size:10.5px;padding:2px 9px;border-radius:12px;border:1px solid ${dc}55;color:${dc};background:${dc}10;font-weight:600;">
+              ${sym2}${vf.dividend.toFixed(2)}/acț${yld ? ` · ${yld.toFixed(2)}% yield` : ''}
+            </span>
+          </div>`;
+        }
+        return '';
+      })()}
+      ${(() => {
         const vf = e.valFundamentals;
         if (vf?.sector !== 'reit') return '';
         const sym = e.currency === 'USD' ? '$' : e.currency + ' ';
@@ -522,6 +538,16 @@ export function exportWatchlistHTML() {
             ${vf.growth!=null?`<span><span style="color:rgba(255,255,255,0.42)">Creștere: </span><b>${fmtN(vf.growth,1)}%</b></span>`:''}
             ${vf.wacc!=null?`<span><span style="color:rgba(255,255,255,0.42)">WACC: </span><b>${fmtN(vf.wacc,1)}%</b></span>`:''}
           </div>
+          ${vf.dividend > 0 ? (() => {
+            const sym3 = e.currency === 'USD' ? '$' : e.currency + ' ';
+            const yld = vf.divYield ?? (e.currentPrice > 0 ? (vf.dividend / e.currentPrice * 100) : null);
+            const dc = !yld ? '#4fc3f7' : yld < 2 ? '#ffee58' : yld < 6 ? '#66bb6a' : yld < 10 ? '#ffa726' : '#ef5350';
+            return `<div style="margin-top:7px;padding-top:7px;border-top:1px solid rgba(255,255,255,0.07);">
+              <span style="font-size:10.5px;color:${dc};font-weight:700;">
+                💰 Dividend: ${sym3}${fmtN(vf.dividend)}/acț${yld ? ` · Yield: ${yld.toFixed(2)}%` : ''}
+              </span>
+            </div>`;
+          })() : ''}
           ${vf.sector === 'reit' ? (() => {
             const sym2 = e.currency === 'USD' ? '$' : e.currency + ' ';
             const reitRows = [];
