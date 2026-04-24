@@ -235,7 +235,7 @@
 <div id="app">
 
   <header>
-    <div class="logo">MC<span>.</span>Stocks.</span> V29-Beta</div>
+    <div class="logo">MC<span>.</span>Stocks.</span> V29</div>
     <div class="tagline">Monte Carlo · 30k Simulari · Sentiment AI</div>
   </header>
 
@@ -380,27 +380,52 @@
             </div>
           </div>
 
-          <!-- ── Grup 3: Metrici REIT — vizibil doar cand sector = reit ── -->
-          <div id="val-reit-block" style="display:none;">
+          <!-- Pret curent — folosit de AI validator (ascuns) -->
+          <span id="val-current-price" style="display:none;" data-price="" data-currency="USD"></span>
+
+          <!-- ── Grup REIT — vizibil doar cand sector = reit ── -->
+          <div id="val-reit-block" style="display:none; margin-bottom:10px;">
             <div style="font-size:9px;font-weight:700;color:rgba(79,195,247,0.40);
-                        letter-spacing:0.8px;text-transform:uppercase;margin-bottom:5px;">
-              🏢 Metrici REIT <span style="color:rgba(255,238,88,0.55);font-weight:600">(auto-completate din Yahoo)</span>
+                        letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;">
+              🏢 Metrici REIT
+              <span style="color:rgba(255,238,88,0.5);font-weight:600;font-size:8.5px;">
+                (auto-completate din Yahoo)
+              </span>
             </div>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:14px;">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;">
               <div class="val-input-group">
-                <label for="val-ltv">LTV % <span style="color:rgba(79,195,247,0.6);font-size:9px;">(Datorii/Active)</span></label>
-                <input type="number" id="val-ltv" placeholder="ex: 35.2" step="0.1" min="0" max="100">
+                <label for="val-ltv" style="color:rgba(79,195,247,0.8);">LTV %
+                  <span style="font-size:8.5px;color:rgba(79,195,247,0.45);">(Datorii/Active)</span>
+                </label>
+                <input type="number" id="val-ltv" placeholder="ex: 35.2" step="0.1" min="0" max="100"
+                       style="border-color:rgba(79,195,247,0.3);">
               </div>
               <div class="val-input-group">
-                <label for="val-occupancy">Rată ocupare %</label>
-                <input type="number" id="val-occupancy" placeholder="ex: 94.5" step="0.1" min="0" max="100">
+                <label for="val-occupancy" style="color:rgba(79,195,247,0.8);">Rată ocupare %</label>
+                <input type="number" id="val-occupancy" placeholder="ex: 94.5" step="0.1" min="0" max="100"
+                       style="border-color:rgba(79,195,247,0.3);">
               </div>
               <div class="val-input-group">
-                <label for="val-dividend">Dividend / acț</label>
-                <input type="number" id="val-dividend" placeholder="ex: 3.20" step="0.01">
+                <label for="val-dividend" style="color:rgba(79,195,247,0.8);">Dividend / acț</label>
+                <input type="number" id="val-dividend" placeholder="ex: 3.20" step="0.01"
+                       style="border-color:rgba(79,195,247,0.3);">
               </div>
             </div>
           </div>
+
+          <!-- ── Buton Validare AI ── -->
+          <div style="margin-bottom:8px;">
+            <button id="val-ai-validate-btn" onclick="window._runAIValidation()"
+              style="display:none;padding:5px 15px;border-radius:14px;
+                     border:1px solid rgba(79,195,247,0.4);background:rgba(79,195,247,0.07);
+                     color:#4fc3f7;font-size:10.5px;font-weight:700;cursor:pointer;
+                     letter-spacing:0.3px;transition:opacity 0.2s;">
+              🤖 Validare AI
+            </button>
+          </div>
+
+          <!-- AI Validator output — populated dynamically -->
+          <div id="val-ai-validation"></div>
 
           <div id="val-results-grid" class="val-results-grid">
             <!-- populated dynamically -->
