@@ -13,7 +13,8 @@ import { $, fmt, setStatus, showSection,
 import { loadIstoric, saveIstoric, loadWatchlist,
          saveToWatchlist, WATCHLIST_KEY }                      from './storage.js';
 import { initValuarePanel, generateQualityComment,
-         YAHOO_TO_VAL_SECTOR, getLastAIScore }                from './valuation.js';
+         YAHOO_TO_VAL_SECTOR, getLastAIScore,
+         validateFundamentalsAI, applyAIValidation }           from './valuation.js';
 import { captureChartsForWatchlist, renderWatchlist,
          exportWatchlistHTML, importWatchlistFiles }           from './watchlist.js';
 
@@ -362,9 +363,6 @@ async function runSimulation() {
             cash:        getValNum('cash'),
             debt:        getValNum('debt'),
             shares:      getValNum('shares'),
-            ltv:         getValNum('ltv'),
-            occupancy:   getValNum('occupancy'),
-            dividend:    getValNum('dividend'),
             resultsHTML:        $('val-results-grid')?.innerHTML          || '',
             fundamentalComment: $('val-fundamental-comment')?.innerHTML  || '',
             // ── Scor AI ──────────────────────────────────
