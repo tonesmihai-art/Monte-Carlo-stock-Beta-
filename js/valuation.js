@@ -354,7 +354,7 @@ function _estimateAndMarkAssets() {
   const _debt   = parseFloat($('val-debt')?.value)   || 0;
   const _cash   = parseFloat($('val-cash')?.value)   || 0;
   const _shares = parseFloat($('val-shares')?.value) || 0;
-  if (\!_aEl || _price <= 0 || _shares <= 0) return;
+  if (!_aEl || _price <= 0 || _shares <= 0) return;
   const _mcapM     = _shares * _price;
   const _estAssets = Math.round(_debt + _cash + _mcapM);
   _aEl.value = _estAssets;
@@ -363,7 +363,7 @@ function _estimateAndMarkAssets() {
   _aEl.style.borderColor = 'rgba(255,167,38,0.4)';
   // Badge "est" langa camp
   let badge = document.getElementById('val-assets-est-badge');
-  if (\!badge) {
+  if (!badge) {
     badge = document.createElement('span');
     badge.id = 'val-assets-est-badge';
     badge.style.cssText = 'font-size:9px;font-weight:700;color:rgba(255,167,38,0.8);' +
@@ -402,7 +402,7 @@ window._runAIValidation = async function () {
         const _taRaw = (_bs?.totalAssets?.raw ?? _bs?.totalAssets)
                     ?? (_bsQ?.totalAssets?.raw ?? _bsQ?.totalAssets)
                     ?? null;
-        if (_taRaw \!= null && isFinite(_taRaw) && _taRaw > 0) {
+        if (_taRaw != null && isFinite(_taRaw) && _taRaw > 0) {
           const _taM = Math.round(_taRaw / 1e6);
           _assetsEl.value = _taM;
           _assetsEl.dataset.estimated = '0';
