@@ -1,0 +1,12 @@
+#ai-tab {
+    padding: 20px;
+    color: #eee;
+}
+
+.ai-card {
+    background: #1c1c1c;
+    border: 1px solid #333;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+}
