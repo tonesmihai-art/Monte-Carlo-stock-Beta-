@@ -346,6 +346,35 @@ window._applyAICorrections = function () {
   updateValuare();
 };
 
+// ── Estimare Active Totale cu badge "est" ────────────────
+function _estimateAndMarkAssets() {
+  const _aEl    = $('val-assets');
+  const _priceEl = $('val-current-price');
+  const _price  = _priceEl ? parseFloat(_priceEl.dataset.price) : 0;
+  const _debt   = parseFloat($('val-debt')?.value)   || 0;
+  const _cash   = parseFloat($('val-cash')?.value)   || 0;
+  const _shares = parseFloat($('val-shares')?.value) || 0;
+  if (\!_aEl || _price <= 0 || _shares <= 0) return;
+  const _mcapM     = _shares * _price;
+  const _estAssets = Math.round(_debt + _cash + _mcapM);
+  _aEl.value = _estAssets;
+  _aEl.dataset.estimated = '1';
+  _aEl.title = 'Estimat: Datorii + Cash + Capitalizare bursiera — apasa Validare AI pentru valoare reala';
+  _aEl.style.borderColor = 'rgba(255,167,38,0.4)';
+  // Badge "est" langa camp
+  let badge = document.getElementById('val-assets-est-badge');
+  if (\!badge) {
+    badge = document.createElement('span');
+    badge.id = 'val-assets-est-badge';
+    badge.style.cssText = 'font-size:9px;font-weight:700;color:rgba(255,167,38,0.8);' +
+      'background:rgba(255,167,38,0.08);border:1px solid rgba(255,167,38,0.3);' +
+      'border-radius:4px;padding:1px 5px;margin-left:5px;letter-spacing:0.3px;vertical-align:middle;';
+    badge.textContent = 'est';
+    _aEl.insertAdjacentElement('afterend', badge);
+  }
+  updateValuare();
+}
+
 // ── Handler buton Validare AI (apelat din HTML onclick) ──
 window._runAIValidation = async function () {
   const btn = document.getElementById('val-ai-validate-btn');
@@ -356,6 +385,38 @@ window._runAIValidation = async function () {
   const _price    = _priceEl ? parseFloat(_priceEl.dataset.price) : 0;
   const _currency = _priceEl ? (_priceEl.dataset.currency || 'USD') : 'USD';
   const _ticker   = document.getElementById('stock-ticker')?.textContent?.trim() || '';
+
+  // -- Incearca sa fetch-uiasca Active Totale real din Yahoo balanceSheet --
+  const _assetsEl = $('val-assets');
+  const _isEstimated = _assetsEl?.dataset.estimated === '1';
+  if (_assetsEl && (_assetsEl.value.trim() === '' || _isEstimated)) {
+    try {
+      const _bsUrl = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${_ticker}?modules=balanceSheetHistory,balanceSheetHistoryQuarterly&formatted=false`;
+      const _bsProxyUrl = `${MY_PROXY_VAL}/proxy?url=${encodeURIComponent(_bsUrl)}`;
+      const _bsResp = await fetch(_bsProxyUrl, { signal: AbortSignal.timeout(8000) });
+      if (_bsResp.ok) {
+        const _bsJson = await _bsResp.json();
+        const _bsR = _bsJson?.quoteSummary?.result?.[0];
+        const _bs  = _bsR?.balanceSheetHistory?.balanceSheetStatements?.[0];
+        const _bsQ = _bsR?.balanceSheetHistoryQuarterly?.balanceSheetStatements?.[0];
+        const _taRaw = (_bs?.totalAssets?.raw ?? _bs?.totalAssets)
+                    ?? (_bsQ?.totalAssets?.raw ?? _bsQ?.totalAssets)
+                    ?? null;
+        if (_taRaw \!= null && isFinite(_taRaw) && _taRaw > 0) {
+          const _taM = Math.round(_taRaw / 1e6);
+          _assetsEl.value = _taM;
+          _assetsEl.dataset.estimated = '0';
+          _assetsEl.title = 'Active Totale — Yahoo Finance (bilant)';
+          _assetsEl.style.borderColor = 'rgba(102,187,106,0.7)';
+          setTimeout(() => { _assetsEl.style.borderColor = ''; }, 1200);
+          // sterge badge est
+          const _badge = document.getElementById('val-assets-est-badge');
+          if (_badge) _badge.remove();
+          updateValuare();
+        }
+      }
+    } catch (_e) { console.warn('[assets fetch]', _e.message); }
+  }
 
   try {
     const result = await validateFundamentalsAI(_ticker, _sector, _currency, _price);
@@ -633,6 +694,11 @@ export function initValuarePanel(currentPrice, currency, yahooSector, ticker, me
     setValInput('assets', d.totalAssets, 0);
     setValInput('cash',   d.cash,        0);
     setValInput('debt',   d.debt,        0);
+    // -- Estimare Active Totale daca Yahoo nu scoate valoarea --
+    const _aEl = $('val-assets');
+    if (_aEl && (_aEl.value === '' || _aEl.value == null)) {
+      _estimateAndMarkAssets();
+    }
     setValInput('growth', d.growth,      1);
     if (d.dividendRate != null) setValInput('dividend', d.dividendRate, 2);
     if (d.ltv          != null) setValInput('ltv',       d.ltv,        1);
