@@ -223,12 +223,6 @@ export async function validateFundamentalsAI(ticker, sector, currency, currentPr
     dividend:  getNum('dividend'),
   };
 
-  // Daca assets e estimat, trimite null — AI vede camp lipsa si sugereaza valoare reala
-  const _aEl = $('val-assets');
-  if (_aEl && _aEl.dataset.estimated === '1') {
-    fields.assets = null;
-  }
-
   const resp = await fetch(`${MY_PROXY_VAL}/validate-fundamentals`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -263,19 +257,6 @@ export function applyAIValidation(result, currency) {
   };
 
   const corrections = result.corrections || {};
-
-  // Auto-aplica LTV si occupancy imediat (valori calculate)
-  ['ltv', 'occupancy'].forEach(id => {
-    if (corrections[id] \!= null) setValInput(id, corrections[id], 1);
-  });
-
-  // Daca AI nu a corectat assets dar e estimat, schimba badge in '~'
-  const _aEl2 = $('val-assets');
-  if (_aEl2 && _aEl2.dataset.estimated === '1' && corrections.assets == null) {
-    const _b = document.getElementById('val-assets-est-badge');
-    if (_b) { _b.textContent = '~'; _b.title = 'Valoare estimata — date bilantiare indisponibile'; }
-  }
-
   const rows = Object.entries(corrections)
     .filter(([, v]) => v != null)
     .map(([id, corrected]) => {
@@ -352,13 +333,6 @@ window._applyAICorrections = function () {
     const dec = ['assets','cash','debt','shares'].includes(id) ? 0
               : ['growth','wacc','tgr','ltv','occupancy'].includes(id) ? 1 : 2;
     setValInput(id, corrected, dec);
-    // Daca assets a fost estimat si acum e corectat de AI, sterge badge-ul est
-    if (id === 'assets') {
-      const _aEl = $('val-assets');
-      if (_aEl) { _aEl.dataset.estimated = '0'; _aEl.title = 'Active Totale - corectat de AI'; }
-      const _badge = document.getElementById('val-assets-est-badge');
-      if (_badge) _badge.remove();
-    }
   });
   // Feedback vizual pe buton
   const btn = document.getElementById('val-ai-apply-btn');
@@ -371,33 +345,6 @@ window._applyAICorrections = function () {
   }
   updateValuare();
 };
-
-// ── Estimare Active Totale cu badge "est" ────────────────
-function _estimateAndMarkAssets() {
-  const _aEl     = $('val-assets');
-  const _priceEl = $('val-current-price');
-  const _price   = _priceEl ? parseFloat(_priceEl.dataset.price) : 0;
-  const _debt    = parseFloat($('val-debt')?.value)   || 0;
-  const _cash    = parseFloat($('val-cash')?.value)   || 0;
-  const _shares  = parseFloat($('val-shares')?.value) || 0;
-  if (\!_aEl || _price <= 0 || _shares <= 0) return;
-  const _estAssets = Math.round(_debt + _cash + (_shares * _price));
-  _aEl.value = _estAssets;
-  _aEl.dataset.estimated = '1';
-  _aEl.title = 'Estimat: Datorii + Cash + Capitalizare bursiera';
-  _aEl.style.borderColor = 'rgba(255,167,38,0.4)';
-  let badge = document.getElementById('val-assets-est-badge');
-  if (\!badge) {
-    badge = document.createElement('span');
-    badge.id = 'val-assets-est-badge';
-    badge.style.cssText = 'font-size:9px;font-weight:700;color:rgba(255,167,38,0.8);' +
-      'background:rgba(255,167,38,0.08);border:1px solid rgba(255,167,38,0.3);' +
-      'border-radius:4px;padding:1px 5px;margin-left:5px;letter-spacing:0.3px;vertical-align:middle;';
-    badge.textContent = 'est';
-    _aEl.insertAdjacentElement('afterend', badge);
-  }
-  updateValuare();
-}
 
 // ── Handler buton Validare AI (apelat din HTML onclick) ──
 window._runAIValidation = async function () {
@@ -686,11 +633,6 @@ export function initValuarePanel(currentPrice, currency, yahooSector, ticker, me
     setValInput('assets', d.totalAssets, 0);
     setValInput('cash',   d.cash,        0);
     setValInput('debt',   d.debt,        0);
-    // Daca Yahoo nu are totalAssets, estimeaza automat
-    const _aAutoEl = $('val-assets');
-    if (_aAutoEl && (_aAutoEl.value === '' || _aAutoEl.value == null || _aAutoEl.value === '0')) {
-      _estimateAndMarkAssets();
-    }
     setValInput('growth', d.growth,      1);
     if (d.dividendRate != null) setValInput('dividend', d.dividendRate, 2);
     if (d.ltv          != null) setValInput('ltv',       d.ltv,        1);
