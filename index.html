@@ -37,53 +37,6 @@
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
-    /* ── Dividend card — separat la dreapta ──────────── */
-    #val-results-grid {
-      position: relative;
-    }
-    .div-info-card-wrapper {
-      display: contents; /* participă în grid ca și celelalte */
-    }
-    /* Cardul dividend mutat cu order la final */
-    .val-div-info-card {
-      order: 999 !important;
-      margin-left: auto;
-      border-left: 2px solid rgba(102,187,106,0.25) !important;
-    }
-    /* Separator vizual înainte de cardul dividend */
-    .val-div-info-card::before {
-      content: '';
-      display: block;
-      position: absolute;
-      width: 1px;
-    }
-
-    /* ── Stare ceata — cand nu are dividend ─────────── */
-    .val-div-fog {
-      opacity: 0.28 !important;
-      filter: blur(0.7px) !important;
-      pointer-events: none;
-      user-select: none;
-      position: relative;
-    }
-    .val-div-fog::after {
-      content: 'Fără dividend';
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 9px;
-      font-weight: 700;
-      color: rgba(255,255,255,0.35);
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      pointer-events: none;
-      filter: none !important;
-      opacity: 1 !important;
-    }
-  </style>
-  <style>
     /* ── Sector & VIX badges ─────────────────────────── */
     #sector-badge { display:none; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap; }
     .sector-chip {
@@ -820,51 +773,6 @@
   </section>
 
 </div>
-
-<script>
-  // ── Dividend Info card — muta la dreapta + ceata daca nu are div ─────
-  (function() {
-    function processDivCard(grid) {
-      // Gasim cardul dupa textul label-ului
-      const cards = grid.querySelectorAll('[class*="val-method"], [class*="vm-label"], .val-method-card, .val-weighted-card, .val-margin-card');
-      let divCard = null;
-
-      // Cautam orice element din grid care contine "Dividend Info"
-      grid.querySelectorAll('*').forEach(el => {
-        if (el.children.length === 0 && el.textContent.trim() === 'Dividend Info') {
-          // Urcam pana la copilul direct al gridului
-          let node = el;
-          while (node.parentElement && node.parentElement !== grid) {
-            node = node.parentElement;
-          }
-          if (node.parentElement === grid) divCard = node;
-        }
-      });
-
-      if (!divCard) return;
-
-      // Aplica clasa pentru order:999 (dreapta)
-      divCard.classList.add('val-div-info-card');
-
-      // Verifica daca are dividend — cautam valoarea afisata
-      // Dividend e 0 sau lipsa daca textul din card contine "$0" sau "—" sau "0.00"
-      const cardText = divCard.textContent || '';
-      const hasDividend = /\$[1-9]/.test(cardText) || /[1-9]\.\d+.*acțiune/i.test(cardText);
-
-      if (!hasDividend) {
-        divCard.classList.add('val-div-fog');
-      } else {
-        divCard.classList.remove('val-div-fog');
-      }
-    }
-
-    const grid = document.getElementById('val-results-grid');
-    if (!grid) return;
-
-    const obs = new MutationObserver(() => processDivCard(grid));
-    obs.observe(grid, { childList: true, subtree: true, characterData: true });
-  })();
-</script>
 
 <script>
   if ('serviceWorker' in navigator) {
