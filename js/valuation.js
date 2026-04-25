@@ -208,33 +208,64 @@ export function updateValuare() {
     ${marginHtml}
     ${dividendCardHtml}
     ${(() => {
+      // ── Card Rată Ocupare ─────────────────────────────
       const isReit   = sector === 'reit';
       const occ      = inputs.occupancy;
       const hasOcc   = occ != null && occ > 0;
-      const occColor = !hasOcc      ? 'rgba(79,195,247,0.6)'
-                     : occ >= 92   ? '#66bb6a'
-                     : occ >= 80   ? '#ffee58'
-                     : occ >= 65   ? '#ffa726'
-                     :               '#ef5350';
-      const occLabel = !hasOcc      ? ''
-                     : occ >= 92   ? 'Excelent'
-                     : occ >= 80   ? 'Bun'
-                     : occ >= 65   ? 'Moderat — urmărește tendința'
-                     :               'Scăzut — risc venituri';
+      const occColor = !hasOcc    ? 'rgba(79,195,247,0.6)'
+                     : occ >= 92 ? '#66bb6a'
+                     : occ >= 80 ? '#ffee58'
+                     : occ >= 65 ? '#ffa726'
+                     :              '#ef5350';
+      const occLabel = !hasOcc    ? ''
+                     : occ >= 92 ? 'Excelent'
+                     : occ >= 80 ? 'Bun'
+                     : occ >= 65 ? 'Moderat — urmărește tendința'
+                     :              'Scăzut — risc venituri';
       const fadeStyle = isReit ? '' : 'opacity:0.45;';
-      if (!hasOcc) {
-        return `<div class="val-method-card" style="${fadeStyle}border-color:rgba(79,195,247,0.18);background:rgba(79,195,247,0.03);">
-          <div class="vm-label" style="color:rgba(79,195,247,0.5);">Rată Ocupare</div>
-          <div class="vm-val" style="color:rgba(255,255,255,0.28);font-size:13px;">${isReit ? 'Lipsă' : '—'}</div>
-          <div class="vm-weight" style="color:rgba(255,255,255,0.18);">% ocupare proprietăți</div>
-        </div>`;
-      }
-      return `<div class="val-method-card" style="${fadeStyle}border-color:${occColor}33;background:${occColor}08;">
-        <div class="vm-label" style="color:${occColor}cc;">Rată Ocupare</div>
-        <div class="vm-val" style="color:${occColor}">${occ.toFixed(1)}<span style="font-size:11px;">%</span></div>
-        <div style="font-size:10px;color:${occColor};margin-top:3px;font-weight:600">${occLabel}</div>
-        <div style="font-size:9px;color:rgba(255,255,255,0.3);margin-top:2px;">% ocupare proprietăți</div>
-      </div>`;
+      const occCard = !hasOcc
+        ? `<div class="val-method-card" style="${fadeStyle}border-color:rgba(79,195,247,0.18);background:rgba(79,195,247,0.03);">
+            <div class="vm-label" style="color:rgba(79,195,247,0.5);">Rată Ocupare</div>
+            <div class="vm-val" style="color:rgba(255,255,255,0.28);font-size:13px;">${isReit ? 'Lipsă' : '—'}</div>
+            <div class="vm-weight" style="color:rgba(255,255,255,0.18);">% spații închiriate / total</div>
+          </div>`
+        : `<div class="val-method-card" style="${fadeStyle}border-color:${occColor}33;background:${occColor}08;">
+            <div class="vm-label" style="color:${occColor}cc;">Rată Ocupare</div>
+            <div class="vm-val" style="color:${occColor}">${occ.toFixed(1)}<span style="font-size:11px;">%</span></div>
+            <div style="font-size:10px;color:${occColor};margin-top:3px;font-weight:600">${occLabel}</div>
+            <div style="font-size:9px;color:rgba(255,255,255,0.3);margin-top:2px;">% spații închiriate / total</div>
+          </div>`;
+
+      // ── Card LTV ─────────────────────────────────────
+      // LTV = Datorii / Active × 100 — masoara levierul financiar al REIT-ului
+      const ltv    = inputs.ltv;
+      const hasLtv = ltv != null && ltv > 0;
+      const ltvColor = !hasLtv    ? 'rgba(79,195,247,0.6)'
+                     : ltv < 30  ? '#66bb6a'
+                     : ltv < 45  ? '#a5d6a7'
+                     : ltv < 55  ? '#ffee58'
+                     : ltv < 65  ? '#ffa726'
+                     :              '#ef5350';
+      const ltvLabel = !hasLtv    ? ''
+                     : ltv < 30  ? 'Conservator — risc scăzut'
+                     : ltv < 45  ? 'Sănătos — nivel optim'
+                     : ltv < 55  ? 'Moderat — monitorizează'
+                     : ltv < 65  ? 'Ridicat — presiune financiară'
+                     :              'Periculos — risc refinanțare';
+      const ltvCard = !hasLtv
+        ? `<div class="val-method-card" style="${fadeStyle}border-color:rgba(79,195,247,0.18);background:rgba(79,195,247,0.03);">
+            <div class="vm-label" style="color:rgba(79,195,247,0.5);">LTV <span style="font-size:8px;opacity:0.6;">(Loan-to-Value)</span></div>
+            <div class="vm-val" style="color:rgba(255,255,255,0.28);font-size:13px;">${isReit ? 'Lipsă' : '—'}</div>
+            <div class="vm-weight" style="color:rgba(255,255,255,0.18);">Datorii / Active totale</div>
+          </div>`
+        : `<div class="val-method-card" style="${fadeStyle}border-color:${ltvColor}33;background:${ltvColor}08;">
+            <div class="vm-label" style="color:${ltvColor}cc;">LTV <span style="font-size:8px;opacity:0.7;">(Loan-to-Value)</span></div>
+            <div class="vm-val" style="color:${ltvColor}">${ltv.toFixed(1)}<span style="font-size:11px;">%</span></div>
+            <div style="font-size:10px;color:${ltvColor};margin-top:3px;font-weight:600">${ltvLabel}</div>
+            <div style="font-size:9px;color:rgba(255,255,255,0.3);margin-top:2px;">Datorii / Active totale</div>
+          </div>`;
+
+      return occCard + ltvCard;
     })()}`;
 }
 
