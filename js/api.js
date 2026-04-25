@@ -614,13 +614,24 @@ async function _fetchYahooTimeseries(ticker) {
       if (!Array.isArray(results)) return null;
 
       const getLatest = (type) => {
+        // Structura 1: fiecare result are campul `type` (ex: {type:'annualTotalAssets', annualTotalAssets:[...]})
         const r = results.find(x => x.type === type);
-        if (!r) return null;
-        const arr = r[type];
-        if (!Array.isArray(arr) || !arr.length) return null;
-        // ia cel mai recent (ultimul din array)
-        const last = arr[arr.length - 1];
-        return last?.reportedValue?.raw ?? last?.value?.raw ?? null;
+        if (r) {
+          const arr = r[type];
+          if (Array.isArray(arr) && arr.length) {
+            const last = arr[arr.length - 1];
+            return last?.reportedValue?.raw ?? last?.value?.raw ?? null;
+          }
+        }
+        // Structura 2: toate tipurile intr-un singur obiect (flat), fara camp `type`
+        for (const obj of results) {
+          const arr = obj[type];
+          if (Array.isArray(arr) && arr.length) {
+            const last = arr[arr.length - 1];
+            return last?.reportedValue?.raw ?? last?.value?.raw ?? null;
+          }
+        }
+        return null;
       };
 
       const assets  = getLatest('annualTotalAssets');
