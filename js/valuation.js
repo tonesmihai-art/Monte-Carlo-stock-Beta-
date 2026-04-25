@@ -174,15 +174,9 @@ export function updateValuare() {
     ${card('Val. FCF', valFCF, formulaFCF, w.fcf)}
     ${card('Val. NAV', valNAV, formulaNAV, w.nav)}
     ${card('Val. DCF', valDCF, formulaDCF, w.dcf)}
-    <div class="val-weighted-card">
-      <div class="vm-label">Val. Medie Ponderată</div>
-      <div class="vm-val">${fv(weighted)}</div>
-      <div class="vm-weight">Preț curent: ${sym}${curPrice > 0 ? curPrice.toFixed(2) : '—'}</div>
-    </div>
-    ${marginHtml}
     ${(() => {
-      const hasDiv = inputs.dividend && inputs.dividend > 0;
-      const yieldPct = hasDiv && priceForYield > 0 ? (inputs.dividend / priceForYield * 100) : null;
+      if (!inputs.dividend || inputs.dividend <= 0) return '';
+      const yieldPct = priceForYield > 0 ? (inputs.dividend / priceForYield * 100) : null;
       const dyColor  = !yieldPct      ? '#888'
                      : yieldPct < 2   ? '#ffee58'
                      : yieldPct < 6   ? '#66bb6a'
@@ -193,20 +187,19 @@ export function updateValuare() {
                      : yieldPct < 6   ? 'Atractiv'
                      : yieldPct < 10  ? 'Ridicat — verifică sustenabilitatea'
                      :                  'Excesiv — posibil yield trap';
-      if (!hasDiv) {
-        return `<div class="val-method-card" style="opacity:0.45;border-color:rgba(136,136,136,0.18);background:rgba(136,136,136,0.04);">
-          <div class="vm-label" style="color:rgba(255,255,255,0.35);">Dividend Info</div>
-          <div class="vm-val" style="color:rgba(255,255,255,0.28);font-size:13px;">Fără dividend</div>
-          <div class="vm-weight" style="color:rgba(255,255,255,0.18);">—</div>
-        </div>`;
-      }
-      return `<div class="val-method-card" style="border-color:${dyColor}33;background:${dyColor}06;">
-        <div class="vm-label">Dividend Info</div>
-        <div class="vm-val" style="color:${dyColor}">${sym}${fmt(inputs.dividend)}<span style="font-size:10px;">/acț</span></div>
+      return `<div class="val-card" style="border-color:${dyColor}33;background:${dyColor}06;">
+        <div class="val-card-label">Dividend Info</div>
+        <div class="val-card-val" style="color:${dyColor}">${sym}${fmt(inputs.dividend)}<span style="font-size:10px;">/acț</span></div>
         ${yieldPct ? `<div style="font-size:10px;color:${dyColor};margin-top:3px;font-weight:600">${yieldPct.toFixed(2)}% yield — ${dyLabel}</div>` : ''}
         <div style="font-size:9px;color:rgba(255,255,255,0.3);margin-top:2px;">Dividend anual / acțiune</div>
       </div>`;
-    })()}`;
+    })()}
+    <div class="val-weighted-card">
+      <div class="vm-label">Val. Medie Ponderată</div>
+      <div class="vm-val">${fv(weighted)}</div>
+      <div class="vm-weight">Preț curent: ${sym}${curPrice > 0 ? curPrice.toFixed(2) : '—'}</div>
+    </div>
+    ${marginHtml}`;
 }
 
 // ── Validare AI prin proxy ────────────────────────────
@@ -594,6 +587,22 @@ export function initValuarePanel(currentPrice, currency, yahooSector, ticker, me
     valPriceEl.dataset.price    = currentPrice;
     valPriceEl.dataset.currency = currency || 'USD';
   }
+
+  // ── Curata campurile la fiecare ticker nou ────────────
+  // Campurile optionale (dividend/ltv/occupancy) se seteaza DOAR daca exista date —
+  // fara reset explicit, valorile de la ticker-ul anterior raman vizibile
+  ['dividend', 'ltv', 'occupancy'].forEach(id => {
+    const el = $(`val-${id}`);
+    if (el) { el.value = ''; el.style.borderColor = ''; }
+  });
+  // Campurile principale care vin din Yahoo
+  ['eps','pe','fcf','assets','cash','debt','shares','growth'].forEach(id => {
+    const el = $(`val-${id}`);
+    if (el) { el.value = ''; el.style.borderColor = ''; }
+  });
+  // Restaureaza defaulturi pentru campurile care nu vin din Yahoo
+  const waccEl = $('val-wacc'); if (waccEl && !waccEl.value) waccEl.value = '9';
+  const tgrEl  = $('val-tgr');  if (tgrEl  && !tgrEl.value)  tgrEl.value  = '2.5';
 
   if (yahooSector && YAHOO_TO_VAL_SECTOR[yahooSector]) {
     const sel = $('val-sector');
