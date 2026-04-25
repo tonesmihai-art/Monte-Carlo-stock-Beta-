@@ -119,6 +119,13 @@ export function updateValuare() {
     }
   }
 
+  // ── Rată Ocupare: vizibil pt REIT, fade 0.45 altfel ──
+  const occupancyGroup = document.getElementById('val-occupancy-group');
+  if (occupancyGroup) {
+    occupancyGroup.style.opacity      = isReit ? '1' : '0.45';
+    occupancyGroup.style.pointerEvents = isReit ? 'auto' : 'none';
+  }
+
 
   // Calculeaza si afiseaza dividend yield automat
   const priceForYield = curPrice || 0;
