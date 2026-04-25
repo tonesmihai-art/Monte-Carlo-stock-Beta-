@@ -629,6 +629,11 @@ async function _fetchYahooTimeseries(ticker) {
       const fcfRaw  = getLatest('annualFreeCashFlow');
 
       console.log(`[TS-raw] ${ticker} results=${results.length} assets=${assets} debt=${debt} cash=${cash} fcf=${fcfRaw}`);
+      if (assets == null && results.length > 0) {
+        const r0 = results[0];
+        const arr0 = r0[r0.type] ?? r0[Object.keys(r0).find(k => k !== 'meta' && k !== 'type')] ?? [];
+        console.log(`[TS-struct] type=${r0.type} arr.length=${arr0.length} sample=`, arr0[arr0.length-1] ?? 'empty');
+      }
       if (assets == null && debt == null) return null;
       const tsResult = {
         totalAssets: assets != null ? assets / 1e6 : null,
