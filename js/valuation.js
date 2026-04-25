@@ -106,10 +106,8 @@ export function updateValuare() {
   if (inputs.dividend > 0 && priceForYield > 0) {
     const yieldPct = (inputs.dividend / priceForYield) * 100;
     if (yieldEl) yieldEl.value = yieldPct.toFixed(2);
-    if (yieldCalcEl) yieldCalcEl.textContent = `(${yieldPct.toFixed(2)}%)`;
   } else {
     if (yieldEl) yieldEl.value = '';
-    if (yieldCalcEl) yieldCalcEl.textContent = '';
   }
 
   const { valEPS, valFCF, valNAV, valDCF, valDDM, weighted, w, growthCapped } = calcValuare({ ...inputs, sector });
