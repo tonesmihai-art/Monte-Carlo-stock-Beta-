@@ -169,37 +169,44 @@ export function updateValuare() {
     commentEl.style.display = 'block';
   }
 
+  // ── Card dividend — calculat o singura data ──────────
+  const _hasDiv   = inputs.dividend != null && inputs.dividend > 0;
+  const _yieldPct = _hasDiv && priceForYield > 0 ? (inputs.dividend / priceForYield * 100) : null;
+  const _dyColor  = !_yieldPct     ? '#888'
+                  : _yieldPct < 2  ? '#ffee58'
+                  : _yieldPct < 6  ? '#66bb6a'
+                  : _yieldPct < 10 ? '#ffa726'
+                  :                   '#ef5350';
+  const _dyLabel  = !_yieldPct     ? ''
+                  : _yieldPct < 2  ? 'Redus'
+                  : _yieldPct < 6  ? 'Atractiv'
+                  : _yieldPct < 10 ? 'Ridicat — verifică sustenabilitatea'
+                  :                   'Excesiv — posibil yield trap';
+  const dividendCardHtml = _hasDiv
+    ? `<div class="val-method-card" style="border-color:${_dyColor}33;background:${_dyColor}06;">
+        <div class="vm-label">Dividend Info</div>
+        <div class="vm-val" style="color:${_dyColor}">${sym}${fmt(inputs.dividend)}<span style="font-size:10px;">/acț</span></div>
+        ${_yieldPct ? `<div style="font-size:10px;color:${_dyColor};margin-top:3px;font-weight:600">${_yieldPct.toFixed(2)}% yield — ${_dyLabel}</div>` : ''}
+        <div style="font-size:9px;color:rgba(255,255,255,0.3);margin-top:2px;">Dividend anual / acțiune</div>
+      </div>`
+    : `<div class="val-method-card" style="opacity:0.45;border-color:rgba(136,136,136,0.18);background:rgba(136,136,136,0.04);">
+        <div class="vm-label" style="color:rgba(255,255,255,0.35);">Dividend Info</div>
+        <div class="vm-val" style="color:rgba(255,255,255,0.28);font-size:13px;">Fără dividend</div>
+        <div class="vm-weight" style="color:rgba(255,255,255,0.18);">—</div>
+      </div>`;
+
   grid.innerHTML = `
     ${card('Val. PE',  valEPS, formulaEPS, w.eps)}
     ${card('Val. FCF', valFCF, formulaFCF, w.fcf)}
     ${card('Val. NAV', valNAV, formulaNAV, w.nav)}
     ${card('Val. DCF', valDCF, formulaDCF, w.dcf)}
-    ${(() => {
-      if (!inputs.dividend || inputs.dividend <= 0) return '';
-      const yieldPct = priceForYield > 0 ? (inputs.dividend / priceForYield * 100) : null;
-      const dyColor  = !yieldPct      ? '#888'
-                     : yieldPct < 2   ? '#ffee58'
-                     : yieldPct < 6   ? '#66bb6a'
-                     : yieldPct < 10  ? '#ffa726'
-                     :                  '#ef5350';
-      const dyLabel  = !yieldPct      ? ''
-                     : yieldPct < 2   ? 'Redus'
-                     : yieldPct < 6   ? 'Atractiv'
-                     : yieldPct < 10  ? 'Ridicat — verifică sustenabilitatea'
-                     :                  'Excesiv — posibil yield trap';
-      return `<div class="val-card" style="border-color:${dyColor}33;background:${dyColor}06;">
-        <div class="val-card-label">Dividend Info</div>
-        <div class="val-card-val" style="color:${dyColor}">${sym}${fmt(inputs.dividend)}<span style="font-size:10px;">/acț</span></div>
-        ${yieldPct ? `<div style="font-size:10px;color:${dyColor};margin-top:3px;font-weight:600">${yieldPct.toFixed(2)}% yield — ${dyLabel}</div>` : ''}
-        <div style="font-size:9px;color:rgba(255,255,255,0.3);margin-top:2px;">Dividend anual / acțiune</div>
-      </div>`;
-    })()}
     <div class="val-weighted-card">
       <div class="vm-label">Val. Medie Ponderată</div>
       <div class="vm-val">${fv(weighted)}</div>
       <div class="vm-weight">Preț curent: ${sym}${curPrice > 0 ? curPrice.toFixed(2) : '—'}</div>
     </div>
-    ${marginHtml}`;
+    ${marginHtml}
+    ${dividendCardHtml}`;
 }
 
 // ── Validare AI prin proxy ────────────────────────────
