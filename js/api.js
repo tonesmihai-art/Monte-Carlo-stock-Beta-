@@ -629,12 +629,14 @@ async function _fetchYahooTimeseries(ticker) {
       const fcfRaw  = getLatest('annualFreeCashFlow');
 
       if (assets == null && debt == null) return null;
-      return {
+      const tsResult = {
         totalAssets: assets != null ? assets / 1e6 : null,
         debt:        debt   != null ? debt   / 1e6 : null,
         cash:        cash   != null ? cash   / 1e6 : null,
         fcfTotal:    fcfRaw != null ? fcfRaw / 1e6 : null,
       };
+      console.log(`[Timeseries] ${ticker} — totalAssets=${tsResult.totalAssets} debt=${tsResult.debt} cash=${tsResult.cash} fcf=${tsResult.fcfTotal}`);
+      return tsResult;
     } catch (_) { return null; }
   };
 
