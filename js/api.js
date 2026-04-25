@@ -639,19 +639,6 @@ async function _fetchYahooTimeseries(ticker) {
       const cash    = getLatest('annualCashAndCashEquivalents');
       const fcfRaw  = getLatest('annualFreeCashFlow');
 
-      console.log(`[TS-raw] ${ticker} results=${results.length} assets=${assets} debt=${debt} cash=${cash} fcf=${fcfRaw}`);
-      if (assets == null && results.length > 0) {
-        results.forEach((r, i) => {
-          const keys = Object.keys(r).filter(k => k !== 'meta');
-          console.log(`[TS-struct] result[${i}] keys=`, keys);
-          keys.forEach(k => {
-            const v = r[k];
-            if (Array.isArray(v) && v.length > 0) {
-              console.log(`  [${k}] last=`, JSON.stringify(v[v.length-1]).slice(0, 200));
-            }
-          });
-        });
-      }
       if (assets == null && debt == null) return null;
       const tsResult = {
         totalAssets: assets != null ? assets / 1e6 : null,
@@ -718,7 +705,6 @@ export async function fetchValuationFundamentals(ticker) {
   let cash        = fh.cash        ?? sec.cash  ?? quote.cash  ?? null;
   let debt        = fh.debt        ?? sec.debt  ?? quote.debt  ?? null;
 
-  console.log(`[Merge] ${ticker} — fh.assets=${fh.totalAssets} sec.assets=${sec.totalAssets} quote.assets=${quote.totalAssets} → merged=${totalAssets}`);
 
   // ── Fallback Yahoo Timeseries (EU REITs — totalAssets adesea null in quoteSummary) ──
   let tsData = {};
