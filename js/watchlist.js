@@ -382,11 +382,11 @@ export function renderWatchlist() {
                style="${btnBase}border:1px solid rgba(239,83,80,0.3);background:transparent;color:#ef5350;">✕</button>
         </div>
       </div>
-      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:5px;">
-        ${(e.pills || []).map(p => `<span style="font-size:10.5px;padding:2px 8px;border-radius:12px;
-             border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);
-             color:rgba(255,255,255,0.65);">${p}</span>`).join('')}
-      </div>
+      ${(e.pills || []).length ? `<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px 16px;font-size:11px;
+                          padding:5px 8px;border-radius:6px;background:rgba(255,255,255,0.025);
+                          border:1px solid rgba(255,255,255,0.06);">
+        ${(e.pills || []).map(p => `<span style="color:rgba(255,255,255,0.65);">${p}</span>`).join('')}
+      </div>` : ''}
       ${e.comment ? `<div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,0.45);line-height:1.55;">${e.comment}</div>` : ''}
       ${(() => {
         if (!vf) return '';
