@@ -236,7 +236,29 @@ window.openWatchlistCharts = function (idx) {
         ${vf.assets != null ? `<span><span style="color:rgba(255,255,255,0.42)">Active: </span><b>${fmtN(vf.assets, 0)}M</b></span>` : ''}
         ${vf.cash   != null ? `<span><span style="color:rgba(255,255,255,0.42)">Cash: </span><b>${fmtN(vf.cash, 0)}M</b></span>` : ''}
         ${vf.debt   != null ? `<span><span style="color:rgba(255,255,255,0.42)">Datorii: </span><b>${fmtN(vf.debt, 0)}M</b></span>` : ''}
+        ${vf.dividend   != null ? `<span><span style="color:rgba(255,255,255,0.42)">Dividend: </span><b style="color:#a5d6a7">${sym}${fmtN(vf.dividend, 2)}/acț</b></span>` : ''}
+        ${vf.occupancy  != null ? `<span><span style="color:rgba(255,255,255,0.42)">Ocupare: </span><b style="color:#4fc3f7">${fmtN(vf.occupancy, 1)}%</b></span>` : ''}
+        ${vf.ltv        != null ? `<span><span style="color:rgba(255,255,255,0.42)">LTV: </span><b style="color:#ffb74d">${fmtN(vf.ltv, 1)}%</b></span>` : ''}
       </div>
+      ${(() => {
+        // ── Rând Valoare Țintă + Marjă Siguranță ──────────
+        const wv = vf.weightedValue;
+        const ms = vf.marginOfSafety;
+        if (wv == null && ms == null) return '';
+        const msColor = ms == null ? '#888'
+                      : ms > 20   ? '#66bb6a'
+                      : ms > 0    ? '#ffee58'
+                      :              '#ef5350';
+        const msLabel = ms == null ? ''
+                      : ms > 20   ? '✔ Subapreciată'
+                      : ms > 0    ? '≈ Corect evaluată'
+                      :              '✘ Supraevaluată';
+        return `<div style="display:flex;align-items:center;gap:18px;padding:8px 10px;margin-bottom:10px;
+                            background:rgba(255,255,255,0.03);border-radius:7px;border:1px solid rgba(255,255,255,0.07);">
+          ${wv != null ? `<span style="font-size:12px;"><span style="color:rgba(255,255,255,0.42)">Val. țintă: </span><b style="color:#ce93d8;font-size:13px;">${sym}${fmtN(wv, 2)}</b></span>` : ''}
+          ${ms != null ? `<span style="font-size:12px;"><span style="color:rgba(255,255,255,0.42)">Marjă: </span><b style="color:${msColor};font-size:13px;">${ms >= 0 ? '+' : ''}${fmtN(ms, 1)}%</b> <span style="font-size:10px;color:${msColor}aa;">${msLabel}</span></span>` : ''}
+        </div>`;
+      })()}
       ${vf.resultsHTML ? `<div class="val-results-grid" style="pointer-events:none;opacity:0.92;">${vf.resultsHTML}</div>` : ''}
       ${vf.fundamentalComment ? `
         <div style="margin-top:12px;padding:12px 14px;
@@ -503,14 +525,24 @@ export function exportWatchlistHTML() {
           vf.fcf    != null ? `FCF/acț: <b>${sym}${fmtN(vf.fcf)}</b>`    : '',
           vf.growth != null ? `Creștere: <b>${fmtN(vf.growth,1)}%</b>`   : '',
           vf.wacc   != null ? `WACC: <b>${fmtN(vf.wacc,1)}%</b>`         : '',
-          vf.tgr    != null ? `Rată term.: <b>${fmtN(vf.tgr,1)}%</b>`    : '',
-          vf.assets != null ? `Active: <b>${fmtN(vf.assets,0)}M</b>`     : '',
-          vf.cash   != null ? `Cash: <b>${fmtN(vf.cash,0)}M</b>`         : '',
-          vf.debt   != null ? `Datorii: <b>${fmtN(vf.debt,0)}M</b>`      : '',
+          vf.tgr      != null ? `Rată term.: <b>${fmtN(vf.tgr,1)}%</b>`          : '',
+          vf.assets   != null ? `Active: <b>${fmtN(vf.assets,0)}M</b>`             : '',
+          vf.cash     != null ? `Cash: <b>${fmtN(vf.cash,0)}M</b>`                 : '',
+          vf.debt     != null ? `Datorii: <b>${fmtN(vf.debt,0)}M</b>`              : '',
+          vf.dividend != null ? `Dividend: <b>${sym}${fmtN(vf.dividend,2)}/acț</b>` : '',
+          vf.occupancy!= null ? `Ocupare: <b>${fmtN(vf.occupancy,1)}%</b>`         : '',
+          vf.ltv      != null ? `LTV: <b>${fmtN(vf.ltv,1)}%</b>`                   : '',
         ].filter(Boolean);
-        if (!summaryParts.length && !vf.resultsHTML) return '';
+        const wv = vf.weightedValue;
+        const ms = vf.marginOfSafety;
+        const msColor = ms == null ? '#888' : ms > 20 ? '#66bb6a' : ms > 0 ? '#ffee58' : '#ef5350';
+        if (!summaryParts.length && !vf.resultsHTML && wv == null) return '';
         return `<div style="margin:10px 0;padding:10px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:8px;font-size:11px;">
           <div style="font-size:9.5px;font-weight:700;color:rgba(255,255,255,0.3);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px;">⚖️ Valuare Fundamentală</div>
+          ${(wv != null || ms != null) ? `<div style="display:flex;gap:16px;margin-bottom:8px;padding:6px 8px;background:rgba(206,147,216,0.06);border-radius:6px;border:1px solid rgba(206,147,216,0.15);">
+            ${wv != null ? `<span>Val. țintă: <b style="color:#ce93d8">${sym}${fmtN(wv,2)}</b></span>` : ''}
+            ${ms != null ? `<span>Marjă: <b style="color:${msColor}">${ms>=0?'+':''}${fmtN(ms,1)}%</b></span>` : ''}
+          </div>` : ''}
           ${summaryParts.length ? `<div style="display:flex;flex-wrap:wrap;gap:4px 16px;color:rgba(255,255,255,0.42);margin-bottom:${vf.resultsHTML ? '10px' : '0'}">
             ${summaryParts.map(p => `<span>${p}</span>`).join('')}
           </div>` : ''}
