@@ -238,7 +238,8 @@ export function updateValuare() {
 
       // ── Card LTV ─────────────────────────────────────
       // LTV = Datorii / Active × 100 — masoara levierul financiar al REIT-ului
-      const ltv    = inputs.ltv;
+      // Afisam valoarea DOAR pentru REIT — pentru altele fortat la "—"
+      const ltv    = isReit ? inputs.ltv : null;
       const hasLtv = ltv != null && ltv > 0;
       const ltvColor = !hasLtv    ? 'rgba(79,195,247,0.6)'
                      : ltv < 30  ? '#66bb6a'
@@ -656,13 +657,10 @@ export function initValuarePanel(currentPrice, currency, yahooSector, ticker, me
   }
 
   // ── Curata campurile la fiecare ticker nou ────────────
-  // Campurile optionale (dividend/ltv/occupancy) se seteaza DOAR daca exista date —
-  // fara reset explicit, valorile de la ticker-ul anterior raman vizibile
   ['dividend', 'ltv', 'occupancy'].forEach(id => {
     const el = $(`val-${id}`);
     if (el) { el.value = ''; el.style.borderColor = ''; }
   });
-  // Campurile principale care vin din Yahoo
   ['eps','pe','fcf','assets','cash','debt','shares','growth'].forEach(id => {
     const el = $(`val-${id}`);
     if (el) { el.value = ''; el.style.borderColor = ''; }
@@ -670,6 +668,11 @@ export function initValuarePanel(currentPrice, currency, yahooSector, ticker, me
   // Restaureaza defaulturi pentru campurile care nu vin din Yahoo
   const waccEl = $('val-wacc'); if (waccEl && !waccEl.value) waccEl.value = '9';
   const tgrEl  = $('val-tgr');  if (tgrEl  && !tgrEl.value)  tgrEl.value  = '2.5';
+  // Curata panelul AI Validator de la ticker-ul anterior
+  const aiValEl = document.getElementById('val-ai-validation');
+  if (aiValEl) aiValEl.innerHTML = '';
+  const aiBtn = document.getElementById('val-ai-validate-btn');
+  if (aiBtn) { aiBtn.style.display = 'none'; aiBtn.disabled = false; aiBtn.textContent = '🤖 Validare AI'; }
 
   if (yahooSector && YAHOO_TO_VAL_SECTOR[yahooSector]) {
     const sel = $('val-sector');
@@ -701,6 +704,14 @@ export function initValuarePanel(currentPrice, currency, yahooSector, ticker, me
     statusEl.style.color = 'rgba(255,255,255,0.4)';
   }
   updateValuare();
+
+  // Buton AI — vizibil dar faded in timpul fetch-ului
+  const aiBtnInit = $('val-ai-validate-btn');
+  if (aiBtnInit) {
+    aiBtnInit.style.display  = 'inline-flex';
+    aiBtnInit.style.opacity  = '0.45';
+    aiBtnInit.style.pointerEvents = 'none';
+  }
 
   if (!ticker) return;
   fetchValuationFundamentals(ticker).then(d => {
@@ -745,9 +756,12 @@ export function initValuarePanel(currentPrice, currency, yahooSector, ticker, me
     statusEl.style.color = 'rgba(102,187,106,0.65)';
     updateValuare();
 
-    // Arata butonul de validare AI dupa ce datele sunt incarcate
+    // Activeaza butonul AI dupa ce datele sunt incarcate
     const aiBtnEl = $('val-ai-validate-btn');
-    if (aiBtnEl) aiBtnEl.style.display = 'inline-flex';
+    if (aiBtnEl) {
+      aiBtnEl.style.opacity       = '1';
+      aiBtnEl.style.pointerEvents = 'auto';
+    }
   }).catch(err => {
     const msg = metaPopulated > 0
       ? '⚠ FCF/cash/datorii indisponibile — completează manual'
@@ -755,6 +769,12 @@ export function initValuarePanel(currentPrice, currency, yahooSector, ticker, me
     statusEl.textContent = msg;
     statusEl.style.color = 'rgba(255,167,38,0.6)';
     console.warn('Val fetch error:', err);
+    // Activeaza butonul si in caz de eroare
+    const aiBtnErr = $('val-ai-validate-btn');
+    if (aiBtnErr) {
+      aiBtnErr.style.opacity       = '1';
+      aiBtnErr.style.pointerEvents = 'auto';
+    }
   });
 }
 
