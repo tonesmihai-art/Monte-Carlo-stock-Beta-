@@ -185,6 +185,14 @@ export function updateValuare() {
   const grid = $('val-results-grid');
   if (!grid) return;
 
+  // ── Salveaza rezultatul curent pentru watchlist ───────
+  _lastValResult = {
+    weightedValue:  weighted,
+    marginOfSafety: (weighted != null && curPrice > 0)
+      ? (weighted - curPrice) / curPrice * 100
+      : null,
+  };
+
   // ── Comentariu calitativ fundamental + tehnic ────────
   const commentEl = ensureFundComment();
   if (commentEl) {
@@ -481,6 +489,10 @@ let _techCtx = {};
 // ── Scor AI 0-100 (fundamental 60% + tehnic 40%) ─────
 let _lastAIScore = null;
 export function getLastAIScore() { return _lastAIScore; }
+
+// ── Ultimul rezultat al calcului de valuare ───────────
+let _lastValResult = null;
+export function getLastValResult() { return _lastValResult; }
 
 function calcAIScore(margin, deviationPct) {
   // Fund score din marja de siguranta fundamentala
