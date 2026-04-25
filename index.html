@@ -347,14 +347,6 @@
               <input type="number" id="val-growth" placeholder="ex: 5" step="0.1" value="5">
             </div>
             <div class="val-input-group">
-              <label for="val-wacc">WACC (%)</label>
-              <input type="number" id="val-wacc" placeholder="ex: 9" step="0.1" value="9">
-            </div>
-            <div class="val-input-group">
-              <label for="val-tgr">TGR (%)</label>
-              <input type="number" id="val-tgr" placeholder="ex: 2.5" step="0.1" value="2.5">
-            </div>
-            <div class="val-input-group">
               <label for="val-dividend">Dividend/acț</label>
               <input type="number" id="val-dividend" placeholder="ex: 1.20" step="0.01">
             </div>
@@ -382,6 +374,18 @@
               <label for="val-shares">Acțiuni (M)</label>
               <input type="number" id="val-shares" placeholder="ex: 152" step="1">
             </div>
+            <div class="val-input-group" id="val-occupancy-group" style="opacity:0.45;transition:opacity 0.2s;">
+              <label for="val-occupancy" title="Procentul de spații închiriate din totalul disponibil — relevant doar pentru REIT-uri">Rată Ocupare (%)</label>
+              <input type="number" id="val-occupancy" placeholder="ex: 95" step="0.1" min="0" max="100">
+            </div>
+            <div class="val-input-group">
+              <label for="val-wacc" title="Costul mediu ponderat al capitalului — rata cu care se actualizează fluxurile viitoare în calculul DCF">WACC (%) <span style="font-size:8px;color:rgba(79,195,247,0.5);">↳ DCF</span></label>
+              <input type="number" id="val-wacc" placeholder="ex: 9" step="0.1" value="9">
+            </div>
+            <div class="val-input-group">
+              <label for="val-tgr" title="Rata de creștere terminală — creșterea anuală perpetuă asumată după cei 10 ani de prognoză DCF">TGR (%) <span style="font-size:8px;color:rgba(79,195,247,0.5);">↳ DCF</span></label>
+              <input type="number" id="val-tgr" placeholder="ex: 2.5" step="0.1" value="2.5">
+            </div>
           </div>
 
           <!-- Pret curent — folosit de AI validator (ascuns) -->
@@ -396,17 +400,12 @@
                 (auto-completate din Yahoo)
               </span>
             </div>
-            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;">
+            <div style="display:grid;grid-template-columns:repeat(1,1fr);gap:7px;">
               <div class="val-input-group">
                 <label for="val-ltv" style="color:rgba(79,195,247,0.8);">LTV %
                   <span style="font-size:8.5px;color:rgba(79,195,247,0.45);">(Datorii/Active)</span>
                 </label>
                 <input type="number" id="val-ltv" placeholder="ex: 35.2" step="0.1" min="0" max="100"
-                       style="border-color:rgba(79,195,247,0.3);">
-              </div>
-              <div class="val-input-group">
-                <label for="val-occupancy" style="color:rgba(79,195,247,0.8);">Rată ocupare %</label>
-                <input type="number" id="val-occupancy" placeholder="ex: 94.5" step="0.1" min="0" max="100"
                        style="border-color:rgba(79,195,247,0.3);">
               </div>
             </div>
