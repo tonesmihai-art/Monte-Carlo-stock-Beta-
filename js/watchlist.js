@@ -392,22 +392,35 @@ export function renderWatchlist() {
         if (!vf) return '';
         const sym  = e.currency === 'USD' ? '$' : e.currency + ' ';
         const fN   = (v, d=2) => v != null ? v.toFixed(d) : null;
-        const wv   = vf.weightedValue;
-        const ms   = vf.marginOfSafety;
-        const msC  = ms == null ? '#888' : ms > 20 ? '#66bb6a' : ms > 0 ? '#ffee58' : '#ef5350';
-        const parts = [
-          wv != null ? `<span style="color:rgba(255,255,255,0.38)">Val. țintă: </span><b style="color:#ce93d8">${sym}${fN(wv, 2)}</b>` : null,
-          ms != null ? `<span style="color:rgba(255,255,255,0.38)">Marjă: </span><b style="color:${msC}">${ms >= 0 ? '+' : ''}${fN(ms, 1)}%</b>` : null,
-          vf.dividend  != null ? `<span style="color:rgba(255,255,255,0.38)">Div: </span><b style="color:#a5d6a7">${sym}${fN(vf.dividend, 2)}</b>` : null,
-          vf.occupancy != null ? `<span style="color:rgba(255,255,255,0.38)">Ocup: </span><b style="color:#4fc3f7">${fN(vf.occupancy, 1)}%</b>` : null,
-          vf.ltv       != null ? `<span style="color:rgba(255,255,255,0.38)">LTV: </span><b style="color:#ffb74d">${fN(vf.ltv, 1)}%</b>` : null,
+        const rowStyle = `margin-top:5px;display:flex;flex-wrap:wrap;gap:4px 16px;font-size:11px;
+                          padding:5px 8px;border-radius:6px;background:rgba(255,255,255,0.025);
+                          border:1px solid rgba(255,255,255,0.06);`;
+        const lbl = (t) => `<span style="color:rgba(255,255,255,0.38)">${t}: </span>`;
+
+        // ── Rând 1: Valoare țintă + Marjă + Div + Ocup + LTV ──
+        const wv  = vf.weightedValue;
+        const ms  = vf.marginOfSafety;
+        const msC = ms == null ? '#888' : ms > 20 ? '#66bb6a' : ms > 0 ? '#ffee58' : '#ef5350';
+        const row1 = [
+          wv != null ? `${lbl('Val. țintă')}<b style="color:#ce93d8">${sym}${fN(wv, 2)}</b>` : null,
+          ms != null ? `${lbl('Marjă')}<b style="color:${msC}">${ms >= 0 ? '+' : ''}${fN(ms, 1)}%</b>` : null,
+          vf.dividend  != null ? `${lbl('Div')}<b style="color:#a5d6a7">${sym}${fN(vf.dividend, 2)}</b>` : null,
+          vf.occupancy != null ? `${lbl('Ocup')}<b style="color:#4fc3f7">${fN(vf.occupancy, 1)}%</b>` : null,
+          vf.ltv       != null ? `${lbl('LTV')}<b style="color:#ffb74d">${fN(vf.ltv, 1)}%</b>` : null,
         ].filter(Boolean);
-        if (!parts.length) return '';
-        return `<div style="margin-top:7px;display:flex;flex-wrap:wrap;gap:4px 16px;font-size:11px;
-                            padding:5px 8px;border-radius:6px;background:rgba(255,255,255,0.025);
-                            border:1px solid rgba(255,255,255,0.06);">
-          ${parts.map(p => `<span>${p}</span>`).join('')}
-        </div>`;
+
+        // ── Rând 2: EPS + P/E + FCF + Creștere + Sector ──────
+        const row2 = [
+          vf.sector != null ? `${lbl('Sector')}<b style="color:rgba(255,255,255,0.7)">${vf.sector}</b>` : null,
+          vf.eps    != null ? `${lbl('EPS')}<b>${sym}${fN(vf.eps, 2)}</b>` : null,
+          vf.pe     != null ? `${lbl('P/E')}<b>${fN(vf.pe, 1)}x</b>` : null,
+          vf.fcf    != null ? `${lbl('FCF/acț')}<b>${sym}${fN(vf.fcf, 2)}</b>` : null,
+          vf.growth != null ? `${lbl('Creștere')}<b style="color:#ffee58">${fN(vf.growth, 1)}%</b>` : null,
+        ].filter(Boolean);
+
+        const r1 = row1.length ? `<div style="${rowStyle}">${row1.map(p=>`<span>${p}</span>`).join('')}</div>` : '';
+        const r2 = row2.length ? `<div style="${rowStyle}">${row2.map(p=>`<span>${p}</span>`).join('')}</div>` : '';
+        return r1 + r2;
       })()}
     </div>`;
   }).join('');
