@@ -346,11 +346,43 @@ export function renderWatchlist() {
   // ── Colorare pill dupa continut ───────────────────────
   function pillColor(p) {
     const s = p.toLowerCase();
+    // σ/zi: volatilitate zilnica
+    if (s.startsWith('σ/zi:') || s.startsWith('s/zi:')) {
+      const m = p.match(/([\d.]+)%/);
+      if (m) {
+        const v = parseFloat(m[1]);
+        return v < 1.0 ? '#66bb6a' : v < 2.0 ? '#ffee58' : v < 3.5 ? '#ffa726' : '#ef5350';
+      }
+    }
+    // GARCH: volatilitate zilnica estimata
+    if (s.startsWith('garch:')) {
+      const m = p.match(/([\d.]+)%/);
+      if (m) {
+        const v = parseFloat(m[1]);
+        return v < 1.0 ? '#66bb6a' : v < 2.0 ? '#ffee58' : v < 3.5 ? '#ffa726' : '#ef5350';
+      }
+    }
+    // IV opt: volatilitate implicita anuala
+    if (s.startsWith('iv opt:')) {
+      const m = p.match(/([\d.]+)%/);
+      if (m) {
+        const v = parseFloat(m[1]);
+        return v > 40 ? '#ffa726' : v > 25 ? '#ffee58' : '#66bb6a';
+      }
+    }
+    // Skew: asimetrie distributie
+    if (s.startsWith('skew:')) {
+      const m = p.match(/([+-][\d.]+)%/);
+      if (m) {
+        const v = parseFloat(m[1]);
+        return v > 2 ? '#ffa726' : v < -2 ? '#a5d6a7' : '#ffee58';
+      }
+    }
     // Drift: pozitiv=verde, negativ=rosu
     if (s.startsWith('drift:')) {
       return /\+/.test(p) ? '#66bb6a' : /-[0-9]/.test(p) ? '#ef9a9a' : null;
     }
-    // Vol/an: risc dupa valoare
+    // Vol/an: risc anual
     if (s.startsWith('vol/an:')) {
       const m = p.match(/([\d.]+)%/);
       if (m) {
@@ -358,14 +390,14 @@ export function renderWatchlist() {
         return v < 20 ? '#66bb6a' : v < 40 ? '#ffee58' : v < 65 ? '#ffa726' : '#ef5350';
       }
     }
-    // Fat-t: cozi
+    // Fat-t: cozi distributie
     if (s.startsWith('fat-t:')) {
       if (s.includes('f. groase') || s.includes('foarte groase')) return '#ef5350';
       if (s.includes('groase'))  return '#ffa726';
       if (s.includes('medii'))   return '#ffee58';
       if (s.includes('normal'))  return '#66bb6a';
     }
-    // MA60 deviere: sub=verde, peste=orange/rosu
+    // MA60 deviere
     if (s.startsWith('ma6') || s.startsWith('ma 6')) {
       const m = p.match(/\(([+-][\d.]+)%\)/);
       if (m) {
@@ -379,23 +411,6 @@ export function renderWatchlist() {
       if (s.includes('trend slab'))     return '#ffee58';
       if (s.includes('corecție') || s.includes('corectie')) return '#ffa726';
       if (s.includes('compresie'))      return '#4fc3f7';
-    }
-    // Skew: pozitiv=usor rosu (cozi dreapta), negativ=usor verde
-    if (s.startsWith('skew:')) {
-      const m = p.match(/([+-][\d.]+)%/);
-      if (m) {
-        const v = parseFloat(m[1]);
-        return v > 5 ? '#ffa726' : v < -5 ? '#a5d6a7' : null;
-      }
-    }
-    // Pers (persistenta GARCH): neutra
-    // IV opt: ridicat=orange
-    if (s.startsWith('iv opt:')) {
-      const m = p.match(/([\d.]+)%/);
-      if (m) {
-        const v = parseFloat(m[1]);
-        return v > 50 ? '#ffa726' : v > 30 ? '#ffee58' : null;
-      }
     }
     return null;
   }
