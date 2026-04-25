@@ -206,7 +206,36 @@ export function updateValuare() {
       <div class="vm-weight">Preț curent: ${sym}${curPrice > 0 ? curPrice.toFixed(2) : '—'}</div>
     </div>
     ${marginHtml}
-    ${dividendCardHtml}`;
+    ${dividendCardHtml}
+    ${(() => {
+      const isReit   = sector === 'reit';
+      const occ      = inputs.occupancy;
+      const hasOcc   = occ != null && occ > 0;
+      const occColor = !hasOcc      ? 'rgba(79,195,247,0.6)'
+                     : occ >= 92   ? '#66bb6a'
+                     : occ >= 80   ? '#ffee58'
+                     : occ >= 65   ? '#ffa726'
+                     :               '#ef5350';
+      const occLabel = !hasOcc      ? ''
+                     : occ >= 92   ? 'Excelent'
+                     : occ >= 80   ? 'Bun'
+                     : occ >= 65   ? 'Moderat — urmărește tendința'
+                     :               'Scăzut — risc venituri';
+      const fadeStyle = isReit ? '' : 'opacity:0.45;';
+      if (!hasOcc) {
+        return `<div class="val-method-card" style="${fadeStyle}border-color:rgba(79,195,247,0.18);background:rgba(79,195,247,0.03);">
+          <div class="vm-label" style="color:rgba(79,195,247,0.5);">Rată Ocupare</div>
+          <div class="vm-val" style="color:rgba(255,255,255,0.28);font-size:13px;">${isReit ? 'Lipsă' : '—'}</div>
+          <div class="vm-weight" style="color:rgba(255,255,255,0.18);">% ocupare proprietăți</div>
+        </div>`;
+      }
+      return `<div class="val-method-card" style="${fadeStyle}border-color:${occColor}33;background:${occColor}08;">
+        <div class="vm-label" style="color:${occColor}cc;">Rată Ocupare</div>
+        <div class="vm-val" style="color:${occColor}">${occ.toFixed(1)}<span style="font-size:11px;">%</span></div>
+        <div style="font-size:10px;color:${occColor};margin-top:3px;font-weight:600">${occLabel}</div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.3);margin-top:2px;">% ocupare proprietăți</div>
+      </div>`;
+    })()}`;
 }
 
 // ── Validare AI prin proxy ────────────────────────────
@@ -259,7 +288,7 @@ export function applyAIValidation(result, currency) {
 
   const LABELS = {
     eps:'EPS', pe:'P/E', fcf:'FCF/acț', growth:'Creștere %',
-    wacc:'WACC %', assets:'Active M', cash:'Cash M', debt:'Datorii M',
+    wacc:'WACC %', assets:'Active T', cash:'Cash M', debt:'Datorii M',
     ltv:'LTV %', dividend:'Dividend', shares:'Acțiuni M',
   };
 
