@@ -388,6 +388,27 @@ export function renderWatchlist() {
              color:rgba(255,255,255,0.65);">${p}</span>`).join('')}
       </div>
       ${e.comment ? `<div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,0.45);line-height:1.55;">${e.comment}</div>` : ''}
+      ${(() => {
+        if (!vf) return '';
+        const sym  = e.currency === 'USD' ? '$' : e.currency + ' ';
+        const fN   = (v, d=2) => v != null ? v.toFixed(d) : null;
+        const wv   = vf.weightedValue;
+        const ms   = vf.marginOfSafety;
+        const msC  = ms == null ? '#888' : ms > 20 ? '#66bb6a' : ms > 0 ? '#ffee58' : '#ef5350';
+        const parts = [
+          wv != null ? `<span style="color:rgba(255,255,255,0.38)">Val. țintă: </span><b style="color:#ce93d8">${sym}${fN(wv, 2)}</b>` : null,
+          ms != null ? `<span style="color:rgba(255,255,255,0.38)">Marjă: </span><b style="color:${msC}">${ms >= 0 ? '+' : ''}${fN(ms, 1)}%</b>` : null,
+          vf.dividend  != null ? `<span style="color:rgba(255,255,255,0.38)">Div: </span><b style="color:#a5d6a7">${sym}${fN(vf.dividend, 2)}</b>` : null,
+          vf.occupancy != null ? `<span style="color:rgba(255,255,255,0.38)">Ocup: </span><b style="color:#4fc3f7">${fN(vf.occupancy, 1)}%</b>` : null,
+          vf.ltv       != null ? `<span style="color:rgba(255,255,255,0.38)">LTV: </span><b style="color:#ffb74d">${fN(vf.ltv, 1)}%</b>` : null,
+        ].filter(Boolean);
+        if (!parts.length) return '';
+        return `<div style="margin-top:7px;display:flex;flex-wrap:wrap;gap:4px 16px;font-size:11px;
+                            padding:5px 8px;border-radius:6px;background:rgba(255,255,255,0.025);
+                            border:1px solid rgba(255,255,255,0.06);">
+          ${parts.map(p => `<span>${p}</span>`).join('')}
+        </div>`;
+      })()}
     </div>`;
   }).join('');
 
