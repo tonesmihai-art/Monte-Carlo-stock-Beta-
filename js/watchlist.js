@@ -416,8 +416,8 @@ export function renderWatchlist() {
     const _msC  = _ms == null ? '#888' : _ms > 20 ? '#66bb6a' : _ms > 0 ? '#ffee58' : '#ef5350';
     const valInline = (_wv != null || _ms != null) ? `
       <span style="display:inline-flex;align-items:center;gap:10px;margin-left:10px;font-size:11px;">
-        ${_wv != null ? `<span style="color:rgba(255,255,255,0.38)">↳ </span><b style="color:#ce93d8">${_sym}${_fN(_wv,2)}</b>` : ''}
-        ${_ms != null ? `<b style="color:${_msC}">${_ms >= 0 ? '+' : ''}${_fN(_ms,1)}%</b>` : ''}
+        ${_wv != null ? `<span style="color:rgba(255,255,255,0.35)">Val. țintă: </span><b style="color:#ce93d8">${_sym}${_fN(_wv,2)}</b>` : ''}
+        ${_ms != null ? `<span style="color:rgba(255,255,255,0.35)">Marjă: </span><b style="color:${_msC}">${_ms >= 0 ? '+' : ''}${_fN(_ms,1)}%</b>` : ''}
       </span>` : '';
 
     const aiBadge   = aiTotal != null ? `
