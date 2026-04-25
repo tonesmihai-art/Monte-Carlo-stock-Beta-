@@ -694,6 +694,8 @@ export async function fetchValuationFundamentals(ticker) {
   let cash        = fh.cash        ?? sec.cash  ?? quote.cash  ?? null;
   let debt        = fh.debt        ?? sec.debt  ?? quote.debt  ?? null;
 
+  console.log(`[Merge] ${ticker} — fh.assets=${fh.totalAssets} sec.assets=${sec.totalAssets} quote.assets=${quote.totalAssets} → merged=${totalAssets}`);
+
   // ── Fallback Yahoo Timeseries (EU REITs — totalAssets adesea null in quoteSummary) ──
   let tsData = {};
   if (totalAssets == null || (cash == null && debt == null)) {
