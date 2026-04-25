@@ -641,9 +641,16 @@ async function _fetchYahooTimeseries(ticker) {
 
       console.log(`[TS-raw] ${ticker} results=${results.length} assets=${assets} debt=${debt} cash=${cash} fcf=${fcfRaw}`);
       if (assets == null && results.length > 0) {
-        const r0 = results[0];
-        const arr0 = r0[r0.type] ?? r0[Object.keys(r0).find(k => k !== 'meta' && k !== 'type')] ?? [];
-        console.log(`[TS-struct] type=${r0.type} arr.length=${arr0.length} sample=`, arr0[arr0.length-1] ?? 'empty');
+        results.forEach((r, i) => {
+          const keys = Object.keys(r).filter(k => k !== 'meta');
+          console.log(`[TS-struct] result[${i}] keys=`, keys);
+          keys.forEach(k => {
+            const v = r[k];
+            if (Array.isArray(v) && v.length > 0) {
+              console.log(`  [${k}] last=`, JSON.stringify(v[v.length-1]).slice(0, 200));
+            }
+          });
+        });
       }
       if (assets == null && debt == null) return null;
       const tsResult = {
