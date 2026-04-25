@@ -189,7 +189,7 @@ export function updateValuare() {
         ${_yieldPct ? `<div style="font-size:10px;color:${_dyColor};margin-top:3px;font-weight:600">${_yieldPct.toFixed(2)}% yield — ${_dyLabel}</div>` : ''}
         <div style="font-size:9px;color:rgba(255,255,255,0.3);margin-top:2px;">Dividend anual / acțiune</div>
       </div>`
-    : `<div class="val-method-card" style="opacity:0.55;border-color:rgba(136,136,136,0.18);background:rgba(136,136,136,0.04);">
+    : `<div class="val-method-card" style="opacity:0.45;border-color:rgba(136,136,136,0.18);background:rgba(136,136,136,0.04);">
         <div class="vm-label" style="color:rgba(255,255,255,0.35);">Dividend Info</div>
         <div class="vm-val" style="color:rgba(255,255,255,0.28);font-size:13px;">Fără dividend</div>
         <div class="vm-weight" style="color:rgba(255,255,255,0.18);">—</div>
@@ -206,7 +206,6 @@ export function updateValuare() {
       <div class="vm-weight">Preț curent: ${sym}${curPrice > 0 ? curPrice.toFixed(2) : '—'}</div>
     </div>
     ${marginHtml}
-    <div style="grid-column:1/-1;height:1px;background:rgba(255,238,88,0.35);margin:4px 0;"></div>
     ${dividendCardHtml}`;
 }
 
