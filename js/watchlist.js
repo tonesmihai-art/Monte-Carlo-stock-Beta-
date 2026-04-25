@@ -408,13 +408,25 @@ export function renderWatchlist() {
     const aiFund    = vf?.aiFundScore ?? null;
     const aiTech    = vf?.aiTechScore ?? null;
     const aiColor   = aiVerdict === 'BUY' ? '#66bb6a' : aiVerdict === 'HOLD' ? '#ffee58' : aiVerdict === 'AVOID' ? '#ef5350' : null;
+    // ── Val. țintă + Marjă inline dupa badge ─────────────
+    const _sym  = e.currency === 'USD' ? '$' : e.currency + ' ';
+    const _fN   = (v, d=2) => v != null ? v.toFixed(d) : null;
+    const _wv   = vf?.weightedValue  ?? null;
+    const _ms   = vf?.marginOfSafety ?? null;
+    const _msC  = _ms == null ? '#888' : _ms > 20 ? '#66bb6a' : _ms > 0 ? '#ffee58' : '#ef5350';
+    const valInline = (_wv != null || _ms != null) ? `
+      <span style="display:inline-flex;align-items:center;gap:10px;margin-left:10px;font-size:11px;">
+        ${_wv != null ? `<span style="color:rgba(255,255,255,0.38)">↳ </span><b style="color:#ce93d8">${_sym}${_fN(_wv,2)}</b>` : ''}
+        ${_ms != null ? `<b style="color:${_msC}">${_ms >= 0 ? '+' : ''}${_fN(_ms,1)}%</b>` : ''}
+      </span>` : '';
+
     const aiBadge   = aiTotal != null ? `
       <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px 3px 7px;
                    border-radius:20px;border:1px solid ${aiColor}44;background:${aiColor}12;
                    font-size:11px;font-weight:700;color:${aiColor};margin-left:8px;">
         ${aiVerdict} <span style="font-size:13px;font-weight:800">${aiTotal}</span>
         <span style="font-size:9px;font-weight:400;color:rgba(255,255,255,0.35)">/100</span>
-      </span>` : '';
+      </span>${valInline}` : '';
     return `
     <div data-idx="${idx}" draggable="true"
          style="background:rgba(255,255,255,0.03);border:1px solid ${aiColor ? aiColor + '22' : 'rgba(255,255,255,0.08)'};
@@ -450,37 +462,26 @@ export function renderWatchlist() {
       ${e.comment ? `<div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,0.45);line-height:1.55;">${e.comment}</div>` : ''}
       ${(() => {
         if (!vf) return '';
-        const sym  = e.currency === 'USD' ? '$' : e.currency + ' ';
-        const fN   = (v, d=2) => v != null ? v.toFixed(d) : null;
+        const sym  = _sym;
+        const fN   = _fN;
         const rowStyle = `margin-top:5px;display:flex;flex-wrap:wrap;gap:4px 16px;font-size:11px;
                           padding:5px 8px;border-radius:6px;background:rgba(255,255,255,0.025);
                           border:1px solid rgba(255,255,255,0.06);`;
         const lbl = (t) => `<span style="color:rgba(255,255,255,0.38)">${t}: </span>`;
 
-        // ── Rând 1: Valoare țintă + Marjă + Div + Ocup + LTV ──
-        const wv  = vf.weightedValue;
-        const ms  = vf.marginOfSafety;
-        const msC = ms == null ? '#888' : ms > 20 ? '#66bb6a' : ms > 0 ? '#ffee58' : '#ef5350';
-        const row1 = [
-          wv != null ? `${lbl('Val. țintă')}<b style="color:#ce93d8">${sym}${fN(wv, 2)}</b>` : null,
-          ms != null ? `${lbl('Marjă')}<b style="color:${msC}">${ms >= 0 ? '+' : ''}${fN(ms, 1)}%</b>` : null,
+        // ── Rând unic: Sector + EPS + P/E + FCF + Creștere + Div + Ocup + LTV ──
+        const row = [
+          vf.sector    != null ? `${lbl('Sector')}<b style="color:rgba(255,255,255,0.7)">${vf.sector}</b>` : null,
+          vf.eps       != null ? `${lbl('EPS')}<b>${sym}${fN(vf.eps, 2)}</b>` : null,
+          vf.pe        != null ? `${lbl('P/E')}<b>${fN(vf.pe, 1)}x</b>` : null,
+          vf.fcf       != null ? `${lbl('FCF/acț')}<b>${sym}${fN(vf.fcf, 2)}</b>` : null,
+          vf.growth    != null ? `${lbl('Creștere')}<b style="color:#ffee58">${fN(vf.growth, 1)}%</b>` : null,
           vf.dividend  != null ? `${lbl('Div')}<b style="color:#a5d6a7">${sym}${fN(vf.dividend, 2)}</b>` : null,
           vf.occupancy != null ? `${lbl('Ocup')}<b style="color:#4fc3f7">${fN(vf.occupancy, 1)}%</b>` : null,
           vf.ltv       != null ? `${lbl('LTV')}<b style="color:#ffb74d">${fN(vf.ltv, 1)}%</b>` : null,
         ].filter(Boolean);
 
-        // ── Rând 2: EPS + P/E + FCF + Creștere + Sector ──────
-        const row2 = [
-          vf.sector != null ? `${lbl('Sector')}<b style="color:rgba(255,255,255,0.7)">${vf.sector}</b>` : null,
-          vf.eps    != null ? `${lbl('EPS')}<b>${sym}${fN(vf.eps, 2)}</b>` : null,
-          vf.pe     != null ? `${lbl('P/E')}<b>${fN(vf.pe, 1)}x</b>` : null,
-          vf.fcf    != null ? `${lbl('FCF/acț')}<b>${sym}${fN(vf.fcf, 2)}</b>` : null,
-          vf.growth != null ? `${lbl('Creștere')}<b style="color:#ffee58">${fN(vf.growth, 1)}%</b>` : null,
-        ].filter(Boolean);
-
-        const r1 = row1.length ? `<div style="${rowStyle}">${row1.map(p=>`<span>${p}</span>`).join('')}</div>` : '';
-        const r2 = row2.length ? `<div style="${rowStyle}">${row2.map(p=>`<span>${p}</span>`).join('')}</div>` : '';
-        return r1 + r2;
+        return row.length ? `<div style="${rowStyle}">${row.map(p=>`<span>${p}</span>`).join('')}</div>` : '';
       })()}
     </div>`;
   }).join('');
