@@ -343,6 +343,63 @@ export function renderWatchlist() {
 
   const btnBase = 'padding:4px 11px;border-radius:12px;font-size:10.5px;cursor:pointer;font-weight:600;';
 
+  // ── Colorare pill dupa continut ───────────────────────
+  function pillColor(p) {
+    const s = p.toLowerCase();
+    // Drift: pozitiv=verde, negativ=rosu
+    if (s.startsWith('drift:')) {
+      return /\+/.test(p) ? '#66bb6a' : /-[0-9]/.test(p) ? '#ef9a9a' : null;
+    }
+    // Vol/an: risc dupa valoare
+    if (s.startsWith('vol/an:')) {
+      const m = p.match(/([\d.]+)%/);
+      if (m) {
+        const v = parseFloat(m[1]);
+        return v < 20 ? '#66bb6a' : v < 40 ? '#ffee58' : v < 65 ? '#ffa726' : '#ef5350';
+      }
+    }
+    // Fat-t: cozi
+    if (s.startsWith('fat-t:')) {
+      if (s.includes('f. groase') || s.includes('foarte groase')) return '#ef5350';
+      if (s.includes('groase'))  return '#ffa726';
+      if (s.includes('medii'))   return '#ffee58';
+      if (s.includes('normal'))  return '#66bb6a';
+    }
+    // MA60 deviere: sub=verde, peste=orange/rosu
+    if (s.startsWith('ma6') || s.startsWith('ma 6')) {
+      const m = p.match(/\(([+-][\d.]+)%\)/);
+      if (m) {
+        const v = parseFloat(m[1]);
+        return v < -15 ? '#66bb6a' : v < -5 ? '#a5d6a7' : v < 5 ? '#ffee58' : v < 15 ? '#ffa726' : '#ef5350';
+      }
+    }
+    // Vol trend
+    if (s.startsWith('vol:')) {
+      if (s.includes('trend confirmat')) return '#66bb6a';
+      if (s.includes('trend slab'))     return '#ffee58';
+      if (s.includes('corecție') || s.includes('corectie')) return '#ffa726';
+      if (s.includes('compresie'))      return '#4fc3f7';
+    }
+    // Skew: pozitiv=usor rosu (cozi dreapta), negativ=usor verde
+    if (s.startsWith('skew:')) {
+      const m = p.match(/([+-][\d.]+)%/);
+      if (m) {
+        const v = parseFloat(m[1]);
+        return v > 5 ? '#ffa726' : v < -5 ? '#a5d6a7' : null;
+      }
+    }
+    // Pers (persistenta GARCH): neutra
+    // IV opt: ridicat=orange
+    if (s.startsWith('iv opt:')) {
+      const m = p.match(/([\d.]+)%/);
+      if (m) {
+        const v = parseFloat(m[1]);
+        return v > 50 ? '#ffa726' : v > 30 ? '#ffee58' : null;
+      }
+    }
+    return null;
+  }
+
   cards.innerHTML = list.map((e, idx) => {
     const hasCharts = e.charts && Object.keys(e.charts).some(k => e.charts[k]);
     const vf = e.valFundamentals;
@@ -385,7 +442,10 @@ export function renderWatchlist() {
       ${(e.pills || []).length ? `<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px 16px;font-size:11px;
                           padding:5px 8px;border-radius:6px;background:rgba(255,255,255,0.025);
                           border:1px solid rgba(255,255,255,0.06);">
-        ${(e.pills || []).map(p => `<span style="color:rgba(255,255,255,0.65);">${p}</span>`).join('')}
+        ${(e.pills || []).map(p => {
+          const c = pillColor(p);
+          return `<span style="color:${c || 'rgba(255,255,255,0.58)'};">${p}</span>`;
+        }).join('')}
       </div>` : ''}
       ${e.comment ? `<div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,0.45);line-height:1.55;">${e.comment}</div>` : ''}
       ${(() => {
