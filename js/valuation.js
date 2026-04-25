@@ -99,6 +99,26 @@ export function updateValuare() {
     occupancy: getNum('occupancy'),
   };
 
+  // ── Nota explicativa REIT + FCF negativ ──────────────
+  const isReit = sector === 'reit';
+  let fcfNoteEl = document.getElementById('val-fcf-reit-note');
+  if (!fcfNoteEl) {
+    fcfNoteEl = document.createElement('div');
+    fcfNoteEl.id = 'val-fcf-reit-note';
+    fcfNoteEl.style.cssText = 'font-size:10px;color:#ffee58;background:rgba(255,238,88,0.07);border-left:2px solid #ffee58;padding:5px 10px;margin:4px 0 6px 0;border-radius:0 4px 4px 0;line-height:1.5;display:none;';
+    // Insereaza dupa randul cu sector/EPS (parintele input-ului sector)
+    const sectorRow = $('val-sector')?.closest('.val-input-group')?.parentElement;
+    if (sectorRow?.parentElement) sectorRow.parentElement.insertBefore(fcfNoteEl, sectorRow.nextSibling);
+  }
+  if (fcfNoteEl) {
+    if (isReit && inputs.fcf != null && inputs.fcf < 0) {
+      fcfNoteEl.textContent = '⚠ FCF negativ la REIT: capex-ul depășește cash-ul operațional — normal în faza de expansiune/investiții. NAV și dividendul sunt indicatorii relevanți, nu FCF-ul.';
+      fcfNoteEl.style.display = 'block';
+    } else {
+      fcfNoteEl.style.display = 'none';
+    }
+  }
+
   // Calculeaza si afiseaza dividend yield automat
   const priceForYield = curPrice || 0;
   const yieldEl = $('val-div-yield');
