@@ -518,4 +518,5 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSectorBadge(VAL_SECTOR_DISPLAY[valKey] || valKey,
                       null, _lastVixData, _lastSectorWeights);
   });
+         
 });
