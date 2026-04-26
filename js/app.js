@@ -12,7 +12,7 @@ import { $, fmt, setStatus, showSection,
          setPillColor, renderSectorBadge, renderPeriod }       from './ui.js';
 import { loadIstoric, saveIstoric, loadWatchlist,
          saveToWatchlist, WATCHLIST_KEY }                      from './storage.js';
-import { initValuarePanel, generateQualityComment,
+import { initValuarePanel, generateQualityComment, updateSimScoreDisplay,
          YAHOO_TO_VAL_SECTOR, getLastAIScore, getLastValResult } from './valuation.js';
 import { captureChartsForWatchlist, renderWatchlist,
          exportWatchlistHTML, importWatchlistFiles }           from './watchlist.js';
@@ -257,6 +257,9 @@ async function runSimulation() {
       setPillColor('pill-skew', 'gray');
       $('info-skew').textContent = 'N/A';
     }
+
+    // ── Scor simulare (toți parametrii disponibili) ───
+    updateSimScoreDisplay({ sigma, garch, nu, drift, vixData, ivData, volumeTrend });
 
     // ── Comentariu calitativ ─────────────────────────
     const qComment = generateQualityComment({
