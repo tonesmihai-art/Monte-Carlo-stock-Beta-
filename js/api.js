@@ -328,6 +328,27 @@ async function _fetchFinnhub(ticker) {
 }
 
 // ── Sector via proxy Render (yfinance server-side) ───────
+// ── IV real din optiuni Yahoo — prin proxy Render (fara CORS) ──
+export async function fetchProxyIV(ticker, currentPrice) {
+  if (!MY_PROXY) return null;
+  try {
+    const r = await fetch(
+      `${MY_PROXY}/iv/${encodeURIComponent(ticker)}?price=${currentPrice}`,
+      { signal: AbortSignal.timeout(12000) }
+    );
+    if (!r.ok) return null;
+    const d = await r.json();
+    if (!d?.ivAnnual || d.ivAnnual <= 0 || d.ivAnnual > 5) return null;
+    return {
+      ivAnnual:  d.ivAnnual,
+      ivDaily:   d.ivDaily,
+      atmStrike: d.atmStrike ?? null,
+      daysToExp: d.daysToExp ?? 30,
+      skewData:  d.skewData  ?? null,
+    };
+  } catch (_) { return null; }
+}
+
 export async function fetchProxySector(ticker) {
   if (!MY_PROXY) return null;
   try {
