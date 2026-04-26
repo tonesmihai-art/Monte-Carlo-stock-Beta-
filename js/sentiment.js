@@ -288,35 +288,44 @@ export async function fetchSectorData(ticker) {
     return { sector, industry, weights };
   }
 
-  const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=assetProfile`;
-  const proxies = [
-    `https://corsproxy.io/?${encodeURIComponent(url)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  // ── Incercari multiple: endpoint × proxy × modul ────
+  const wrap = (proxy, url) => `${proxy}${encodeURIComponent(url)}`;
+  const P1 = 'https://corsproxy.io/?';
+  const P2 = 'https://api.allorigins.win/raw?url=';
+
+  const attempts = [
+    // assetProfile — query1, query2
+    { url: wrap(P1, `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=assetProfile`), pick: d => d?.quoteSummary?.result?.[0]?.assetProfile },
+    { url: wrap(P2, `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=assetProfile`), pick: d => d?.quoteSummary?.result?.[0]?.assetProfile },
+    { url: wrap(P1, `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=assetProfile`), pick: d => d?.quoteSummary?.result?.[0]?.assetProfile },
+    // summaryProfile — uneori disponibil pt .AS, .DE, .PA
+    { url: wrap(P1, `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=summaryProfile`), pick: d => d?.quoteSummary?.result?.[0]?.summaryProfile },
+    { url: wrap(P2, `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=summaryProfile`), pick: d => d?.quoteSummary?.result?.[0]?.summaryProfile },
+    // price module — are sector pt unele tickere
+    { url: wrap(P1, `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=price`), pick: d => d?.quoteSummary?.result?.[0]?.price },
+    { url: wrap(P2, `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=price`), pick: d => d?.quoteSummary?.result?.[0]?.price },
+    // v11 — versiune mai noua, uneori mai putin blocata
+    { url: wrap(P1, `https://query1.finance.yahoo.com/v11/finance/quoteSummary/${ticker}?modules=assetProfile`), pick: d => d?.quoteSummary?.result?.[0]?.assetProfile },
   ];
 
-  for (const proxyUrl of proxies) {
+  for (const { url: proxyUrl, pick } of attempts) {
     try {
-      const r = await fetchWithTimeout(proxyUrl, 4000);
+      const r = await fetchWithTimeout(proxyUrl, 5000);
       if (!r.ok) continue;
-      const data     = await r.json();
-      const profile  = data?.quoteSummary?.result?.[0]?.assetProfile;
-      // ── DEBUG — sterge dupa verificare ──────────────
-      console.group('%c[MC.Stocks] fetchSectorData — raw Yahoo API', 'color:#ffa726;font-weight:700');
-      console.log('proxy folosit:', proxyUrl.slice(0, 60) + '...');
-      console.log('assetProfile complet:', profile);
-      console.log('sector:', profile?.sector);
-      console.log('industry:', profile?.industry);
-      console.log('quoteType:', data?.quoteSummary?.result?.[0]?.quoteType);
-      console.groupEnd();
-      // ────────────────────────────────────────────────
-      const sector   = profile?.sector;
+      const data    = await r.json();
+      const profile = pick(data);
+      const sector  = profile?.sector;
       const industry = profile?.industry;
+      // ── DEBUG — sterge dupa verificare ──────────────
+      console.log(`%c[Sector] ${proxyUrl.slice(0,55)}...`, 'color:#ffa726',
+        '→ sector:', sector ?? 'null', '| industry:', industry ?? 'null');
+      // ────────────────────────────────────────────────
       if (sector) {
         const weights = SECTOR_WEIGHTS[sector] || SECTOR_WEIGHTS['Unknown'];
         return { sector, industry: industry || sector, weights };
       }
     } catch (e) {
-      console.warn('Sector fetch timeout/fail:', e.message);
+      console.warn(`[Sector] timeout/fail (${proxyUrl.slice(0,40)}...):`, e.message);
     }
   }
 
