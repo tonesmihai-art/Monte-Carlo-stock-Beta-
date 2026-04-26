@@ -286,10 +286,6 @@ async function fetchWithTimeout(url, ms = 4000) {
 }
 
 export async function fetchSectorData(ticker) {
-  // ── TEST FINNHUB — sterge dupa verificare ──
-  fetchFinnhubSector(ticker).then(r => console.log('[Finnhub TEST]', ticker, '→', r)).catch(e => console.warn('[Finnhub TEST] eroare:', e.message));
-  // ──────────────────────────────────────────
-
   if (ticker.includes('-USD') || ticker.includes('-EUR') ||
       ticker.includes('-BTC') || ['BTC','ETH','BNB','SOL','XRP'].includes(ticker)) {
     return { sector: 'Cryptocurrency', industry: 'Cryptocurrency', weights: SECTOR_WEIGHTS['Cryptocurrency'] };
