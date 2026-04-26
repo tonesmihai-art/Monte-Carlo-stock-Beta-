@@ -327,6 +327,42 @@ async function _fetchFinnhub(ticker) {
   return { eps, pe, fcfPerShare, growth, shares, totalAssets, cash: cashFH, debt: debtFH };
 }
 
+// ── Sector din Finnhub profile2 — fallback pt tickere EU ─
+export async function fetchFinnhubSector(ticker) {
+  if (!FINNHUB_KEY) return null;
+  const fhTicker = _toFinnhubTicker(ticker);
+  try {
+    const r = await fetch(
+      `https://finnhub.io/api/v1/stock/profile2?symbol=${fhTicker}&token=${FINNHUB_KEY}`,
+      { signal: AbortSignal.timeout(7000) }
+    );
+    if (!r.ok) return null;
+    const p = await r.json();
+    if (!p?.finnhubIndustry) return null;
+    // Mapeaza industria Finnhub → sector Yahoo-style
+    const ind = p.finnhubIndustry.toLowerCase();
+    const sector =
+      /software|semiconductor|internet|electronic compon|tech|data|cloud|cyber|artificial|saas/.test(ind) ? 'Technology'
+    : /telecom|communication|media|broadcast|wireless/.test(ind)                                          ? 'Communication Services'
+    : /insurance/.test(ind)                                                                               ? 'Insurance'
+    : /bank|financial services|asset management|capital market|credit service/.test(ind)                 ? 'Financial Services'
+    : /reit|real estate/.test(ind)                                                                        ? 'Real Estate'
+    : /oil|gas|energy|petroleum|coal|pipeline|lng/.test(ind)                                             ? 'Energy'
+    : /utilit|electric power|water util|renewable/.test(ind)                                              ? 'Utilities'
+    : /drug|pharma|biotech|medical|hospital|health plan|diagnostics|life science/.test(ind)              ? 'Healthcare'
+    : /gold|silver|steel|mining|material|chemical|aluminum|copper|lithium/.test(ind)                     ? 'Basic Materials'
+    : /auto manufacturer|automobile|vehicle/.test(ind)                                                   ? 'Auto Manufacturers'
+    : /tobacco|cigarette/.test(ind)                                                                      ? 'Consumer Defensive'
+    : /food|beverage|grocery|consumer staple|household/.test(ind)                                        ? 'Consumer Defensive'
+    : /shipping|freight|marine|logistics|courier/.test(ind)                                              ? 'Industrials'
+    : /aerospace|defense|industrial|machinery|equipment|electrical|manufacture|construct/.test(ind)      ? 'Industrials'
+    : 'Unknown';
+    return { sector, industry: p.finnhubIndustry };
+  } catch (e) {
+    return null;
+  }
+}
+
 
 
 
