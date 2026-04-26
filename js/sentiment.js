@@ -300,6 +300,15 @@ export async function fetchSectorData(ticker) {
       if (!r.ok) continue;
       const data     = await r.json();
       const profile  = data?.quoteSummary?.result?.[0]?.assetProfile;
+      // ── DEBUG — sterge dupa verificare ──────────────
+      console.group('%c[MC.Stocks] fetchSectorData — raw Yahoo API', 'color:#ffa726;font-weight:700');
+      console.log('proxy folosit:', proxyUrl.slice(0, 60) + '...');
+      console.log('assetProfile complet:', profile);
+      console.log('sector:', profile?.sector);
+      console.log('industry:', profile?.industry);
+      console.log('quoteType:', data?.quoteSummary?.result?.[0]?.quoteType);
+      console.groupEnd();
+      // ────────────────────────────────────────────────
       const sector   = profile?.sector;
       const industry = profile?.industry;
       if (sector) {
