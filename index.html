@@ -458,9 +458,12 @@
           </div>
           <div id="stock-ticker" class="stock-ticker">—</div>
           <div id="sector-badge"></div>
-          <div style="margin-top:8px; font-size:11px; letter-spacing:1.5px; text-transform:uppercase;
-                      color:rgba(124,106,247,0.8); font-family:var(--font-sans);">
-            🎲 Simulare Monte Carlo · 30 000 scenarii · GBM + GARCH(1,1) + Student-t · Sentiment AI
+          <div style="margin-top:8px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+            <div style="font-size:11px; letter-spacing:1.5px; text-transform:uppercase;
+                        color:rgba(124,106,247,0.8); font-family:var(--font-sans);">
+              🎲 Simulare Monte Carlo · 30 000 scenarii · GBM + GARCH(1,1) + Student-t · Sentiment AI
+            </div>
+            <div id="sim-score-inline" style="display:none; flex-shrink:0;"></div>
           </div>
           <div id="quality-comment" style="display:none; margin-top:10px; padding:9px 13px;
                border-radius:8px; border:1px solid rgba(255,255,255,0.08);
