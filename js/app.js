@@ -22,8 +22,27 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 
+// ── Mapping cheie internă → nume afișat în badge ─────
+const VAL_SECTOR_DISPLAY = {
+  tech:         'Technology',
+  energy:       'Energy',
+  utilitati:    'Utilities',
+  healthcare:   'Healthcare',
+  banci:        'Financial Services',
+  asigurari:    'Insurance',
+  materiale:    'Basic Materials',
+  auto:         'Auto / Industrials',
+  conglomerate: 'Industrials',
+  consum:       'Consumer',
+  reit:         'Real Estate',
+  shipping:     'Shipping / Transport',
+  tutun:        'Consumer Defensive',
+};
+
 // ── State global ─────────────────────────────────────
-let currentResult = null;
+let currentResult      = null;
+let _lastVixData       = null;
+let _lastSectorWeights = null;
 
 // ── Istoric simulari ──────────────────────────────────
 
@@ -148,11 +167,16 @@ async function runSimulation() {
       if (ivResult.status === 'fulfilled')     ivData        = ivResult.value;
       if (sectorResult.status === 'fulfilled') sectorWeights = sectorResult.value.weights;
       if (vixResult.status === 'fulfilled')    vixData       = vixResult.value;
+      _lastVixData = vixData;
       if (sectorResult.status === 'fulfilled') {
-        renderSectorBadge(sectorResult.value.sector, sectorResult.value.industry,
-                          vixData, sectorResult.value.weights);
+        _lastSectorWeights = sectorResult.value.weights;
+        // initValuarePanel seteaza #val-sector din Yahoo (via YAHOO_TO_VAL_SECTOR)
         initValuarePanel(currentPrice, currency, sectorResult.value.sector, ticker, fundamentals,
                          { deviationPct, drift, sigma, mean50 });
+        // Badge citeste direct din dropdown — o singura sursa de adevar
+        const valKey = $('val-sector')?.value || 'tech';
+        renderSectorBadge(VAL_SECTOR_DISPLAY[valKey] || valKey,
+                          sectorResult.value.industry, vixData, sectorResult.value.weights);
       } else {
         initValuarePanel(currentPrice, currency, null, ticker, fundamentals,
                          { deviationPct, drift, sigma, mean50 });
@@ -483,5 +507,12 @@ document.addEventListener('DOMContentLoaded', () => {
     chip.addEventListener('click', () => {
       $('ticker-input').value = chip.dataset.ticker;
     });
+  });
+
+  // ── Sync badge la schimbarea manuala a sectorului ────
+  $('val-sector')?.addEventListener('change', () => {
+    const valKey = $('val-sector').value;
+    renderSectorBadge(VAL_SECTOR_DISPLAY[valKey] || valKey,
+                      null, _lastVixData, _lastSectorWeights);
   });
 });
