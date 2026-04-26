@@ -805,4 +805,5 @@ export async function fetchValuationFundamentals(ticker) {
   };
   if (Object.values(result).filter(v => v !== result.sources).every(v => v == null)) throw new Error('Date indisponibile');
   return result;
+  
 }
