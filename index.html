@@ -442,8 +442,11 @@
 
       <div class="stock-bar">
         <div>
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
             <div id="stock-name" class="stock-name">—</div>
+            <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+              <div id="val-score-inline" style="display:none;"></div>
+            </div>
             <button id="save-watchlist-btn" style="display:none; flex-shrink:0; padding:6px 14px;
                  border-radius:20px; border:1px solid rgba(79,195,247,0.4);
                  background:rgba(79,195,247,0.08); color:#4fc3f7; font-size:11.5px;
@@ -472,6 +475,26 @@
             Parametrii simularii &nbsp;·&nbsp; hover pe
             <i class="tip-icon" style="pointer-events:none; vertical-align:middle;">i</i>
             pentru detalii
+          </div>
+
+          <!-- VIX — INDICELE PIETEI -->
+          <div class="pill" id="pill-vix" style="display:none;">
+            <span class="tip-wrap">
+              VIX:
+              <i class="tip-icon" id="pill-vix-tip-icon">i</i>
+              <div class="tip-bubble">
+                <strong>😱 VIX — Indicele fricii pietei</strong>
+                Masoara volatilitatea <em>implicita</em> asteptata de piata pe urmatoarele 30 de zile. Cu cat e mai mare, cu atat piata anticipeaza miscari bruste.
+                <div class="tip-scale" style="margin-top:6px">
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> &lt; 15 — piata calma, sigma normala</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ffee58"></span> 15–25 — normal, impact minor</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ffa726"></span> 25–35 — ingrijorare, sigma +20%</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ef5350"></span> &gt; 35 — panica, sigma +40%</div>
+                </div>
+                <span class="tip-impact" id="pill-vix-tip-impact">Influenteaza: sigma in simulare</span>
+              </div>
+            </span>
+            <span id="info-vix">—</span>
           </div>
 
           <!-- SIGMA STATICA -->
