@@ -6,6 +6,8 @@
 //  + Detectie sector + VIX
 // ─────────────────────────────────────────────────────
 
+import { fetchFinnhubSector } from './api.js';
+
 // Lexicon VADER simplificat (cuvinte financiare + general)
 const VADER_LEXICON = {
   'good':0.9,'great':1.5,'excellent':2.0,'strong':1.2,'growth':1.3,
@@ -288,48 +290,23 @@ export async function fetchSectorData(ticker) {
     return { sector, industry, weights };
   }
 
-  // ── Incercari multiple: endpoint × proxy × modul ────
-  const wrap = (proxy, url) => `${proxy}${encodeURIComponent(url)}`;
-  const P1 = 'https://corsproxy.io/?';
-  const P2 = 'https://api.allorigins.win/raw?url=';
-
-  const attempts = [
-    // assetProfile — query1, query2
-    { url: wrap(P1, `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=assetProfile`), pick: d => d?.quoteSummary?.result?.[0]?.assetProfile },
-    { url: wrap(P2, `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=assetProfile`), pick: d => d?.quoteSummary?.result?.[0]?.assetProfile },
-    { url: wrap(P1, `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=assetProfile`), pick: d => d?.quoteSummary?.result?.[0]?.assetProfile },
-    // summaryProfile — uneori disponibil pt .AS, .DE, .PA
-    { url: wrap(P1, `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=summaryProfile`), pick: d => d?.quoteSummary?.result?.[0]?.summaryProfile },
-    { url: wrap(P2, `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=summaryProfile`), pick: d => d?.quoteSummary?.result?.[0]?.summaryProfile },
-    // price module — are sector pt unele tickere
-    { url: wrap(P1, `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=price`), pick: d => d?.quoteSummary?.result?.[0]?.price },
-    { url: wrap(P2, `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=price`), pick: d => d?.quoteSummary?.result?.[0]?.price },
-    // v11 — versiune mai noua, uneori mai putin blocata
-    { url: wrap(P1, `https://query1.finance.yahoo.com/v11/finance/quoteSummary/${ticker}?modules=assetProfile`), pick: d => d?.quoteSummary?.result?.[0]?.assetProfile },
-  ];
-
-  for (const { url: proxyUrl, pick } of attempts) {
-    try {
-      const r = await fetchWithTimeout(proxyUrl, 5000);
-      if (!r.ok) continue;
+  // ── Yahoo quoteSummary — o singura incercare rapida (US tickers) ──
+  try {
+    const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=assetProfile`;
+    const r   = await fetchWithTimeout(`https://corsproxy.io/?${encodeURIComponent(url)}`, 5000);
+    if (r.ok) {
       const data    = await r.json();
-      const profile = pick(data);
+      const profile = data?.quoteSummary?.result?.[0]?.assetProfile;
       const sector  = profile?.sector;
       const industry = profile?.industry;
-      // ── DEBUG — sterge dupa verificare ──────────────
-      console.log(`%c[Sector] ${proxyUrl.slice(0,55)}...`, 'color:#ffa726',
-        '→ sector:', sector ?? 'null', '| industry:', industry ?? 'null');
-      // ────────────────────────────────────────────────
       if (sector) {
         const weights = SECTOR_WEIGHTS[sector] || SECTOR_WEIGHTS['Unknown'];
         return { sector, industry: industry || sector, weights };
       }
-    } catch (e) {
-      console.warn(`[Sector] timeout/fail (${proxyUrl.slice(0,40)}...):`, e.message);
     }
-  }
+  } catch (_) {}
 
-  // Fallback: detecteaza sectorul din numele companiei (Yahoo nu a raspuns)
+  // Fallback: detecteaza sectorul din numele companiei
   try {
     const chartUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=5d`;
     const r = await fetchWithTimeout(`https://corsproxy.io/?${encodeURIComponent(chartUrl)}`, 4000);
@@ -349,6 +326,15 @@ export async function fetchSectorData(ticker) {
         const weights = SECTOR_WEIGHTS[detected] || SECTOR_WEIGHTS['Unknown'];
         return { sector: detected, industry: detected, weights };
       }
+    }
+  } catch (_) {}
+
+  // Fallback final: Finnhub profile2 (pt tickere EU blocate de Yahoo)
+  try {
+    const fhResult = await fetchFinnhubSector(ticker);
+    if (fhResult && fhResult.sector && fhResult.sector !== 'Unknown') {
+      const weights = SECTOR_WEIGHTS[fhResult.sector] || SECTOR_WEIGHTS['Unknown'];
+      return { sector: fhResult.sector, industry: fhResult.industry, weights };
     }
   } catch (_) {}
 
