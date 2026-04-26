@@ -94,9 +94,11 @@ export function updateValuare() {
   };
   const sector    = $('val-sector')?.value || 'tech';
   const priceEl   = $('val-current-price');
-  const curPrice  = priceEl ? parseFloat(priceEl.dataset.price)   : 0;
+  const rawPrice  = priceEl ? parseFloat(priceEl.dataset.price)   : 0;
   const currency  = priceEl ? (priceEl.dataset.currency || 'USD') : 'USD';
-  const sym       = currency === 'USD' ? '$' : currency + ' ';
+  const isGBp     = currency === 'GBp';
+  const curPrice  = isGBp ? rawPrice / 100 : rawPrice;   // GBp pence → GBP lire
+  const sym       = isGBp ? 'GBP ' : (currency === 'USD' ? '$' : currency + ' ');
 
   const inputs = {
     eps: getNum('eps'), pe: getNum('pe'), fcf: getNum('fcf'),
