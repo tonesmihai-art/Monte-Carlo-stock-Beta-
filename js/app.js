@@ -168,6 +168,17 @@ async function runSimulation() {
       if (sectorResult.status === 'fulfilled') sectorWeights = sectorResult.value.weights;
       if (vixResult.status === 'fulfilled')    vixData       = vixResult.value;
       _lastVixData = vixData;
+      // ── DEBUG sector Yahoo — sterge dupa verificare ──
+      console.group(`%c[MC.Stocks] Sector fetch — ${ticker}`, 'color:#4fc3f7;font-weight:700');
+      console.log('status:', sectorResult.status);
+      if (sectorResult.status === 'fulfilled') {
+        console.log('sector (Yahoo brut):', sectorResult.value.sector);
+        console.log('industry:', sectorResult.value.industry);
+        console.log('weights:', sectorResult.value.weights);
+      } else {
+        console.warn('fetch esuat:', sectorResult.reason);
+      }
+      console.groupEnd();
       if (sectorResult.status === 'fulfilled') {
         _lastSectorWeights = sectorResult.value.weights;
         // initValuarePanel seteaza #val-sector din Yahoo (via YAHOO_TO_VAL_SECTOR)
@@ -175,6 +186,7 @@ async function runSimulation() {
                          { deviationPct, drift, sigma, mean50 });
         // Badge citeste direct din dropdown — o singura sursa de adevar
         const valKey = $('val-sector')?.value || 'tech';
+        console.log('%c[MC.Stocks] val-sector dropdown după init:', 'color:#ce93d8', valKey, '→', VAL_SECTOR_DISPLAY[valKey] || valKey);
         renderSectorBadge(VAL_SECTOR_DISPLAY[valKey] || valKey,
                           sectorResult.value.industry, vixData, sectorResult.value.weights);
       } else {
