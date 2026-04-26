@@ -496,12 +496,162 @@ window.toggleValuare = function () {
 let _techCtx = {};
 
 // ── Scor AI 0-100 (fundamental 60% + tehnic 40%) ─────
-let _lastAIScore = null;
+let _lastAIScore  = null;
 export function getLastAIScore() { return _lastAIScore; }
+
+// ── Scor simulare + marja stocate pentru scorul final ─
+let _lastSimScore = null;
+let _lastMargin   = null;
 
 // ── Ultimul rezultat al calcului de valuare ───────────
 let _lastValResult = null;
 export function getLastValResult() { return _lastValResult; }
+
+// ── Calcul scor simulare 0-100 ────────────────────────
+function calcSimScore({ sigma, garch, nu, drift, vixData, ivData, volumeTrend }) {
+  const driftAnn  = (drift  ?? 0)    * 252 * 100;
+  const sigmaAnn  = (sigma  ?? 0.01) * Math.sqrt(252) * 100;
+  const pers      = garch?.persistence ?? 0.88;
+  const nuVal     = nu  ?? 10;
+  const vix       = vixData?.vix ?? 20;
+
+  const driftScore = driftAnn > 20 ? 90 : driftAnn > 10 ? 75 : driftAnn > 0 ? 58
+                   : driftAnn > -10 ? 38 : driftAnn > -20 ? 20 : 8;
+  const sigmaScore = sigmaAnn < 15 ? 85 : sigmaAnn < 25 ? 70 : sigmaAnn < 35 ? 50
+                   : sigmaAnn < 50 ? 30 : 12;
+  const garchScore = pers < 0.80 ? 82 : pers < 0.88 ? 65 : pers < 0.93 ? 45
+                   : pers < 0.97 ? 25 : 10;
+  const nuScore    = nuVal > 15 ? 80 : nuVal > 8 ? 65 : nuVal > 5 ? 45 : nuVal > 3 ? 25 : 10;
+  const vixScore   = vix  < 15 ? 85 : vix  < 25 ? 65 : vix  < 35 ? 38 : 15;
+
+  let ivScore = 55;
+  if (ivData?.ivAnnual && sigma > 0) {
+    const r = ivData.ivAnnual / (sigma * Math.sqrt(252));
+    ivScore = r < 0.85 ? 82 : r < 1.20 ? 62 : r < 1.60 ? 38 : 18;
+  }
+  let skewScore = 55;
+  if (ivData?.skewData?.skew != null) {
+    const sk = ivData.skewData.skew;
+    skewScore = sk < 0 ? 78 : sk < 0.08 ? 62 : sk < 0.15 ? 40 : 20;
+  }
+  const vtDetail = typeof volumeTrend === 'object' ? (volumeTrend?.detail ?? '') : '';
+  const volScore = vtDetail === 'bullish' ? 80 : vtDetail.includes('bullish') ? 65
+                 : vtDetail === 'bearish' ? 25 : vtDetail.includes('bearish') ? 35 : 50;
+
+  const total = Math.round(
+    driftScore * 0.20 + sigmaScore * 0.20 + garchScore * 0.15 + nuScore * 0.15 +
+    vixScore   * 0.10 + ivScore    * 0.10 + skewScore  * 0.05 + volScore * 0.05
+  );
+  const verdict = total >= 68 ? 'FAVORABIL' : total >= 42 ? 'NEUTRU' : 'RISC';
+  return { total, verdict, driftScore, sigmaScore, garchScore, nuScore, vixScore, ivScore, skewScore, volScore };
+}
+
+// ── Actualizeaza scorul combinat langa numele firmei ──
+function _updateCombinedInline() {
+  const el = document.getElementById('val-score-inline');
+  if (!el || !_lastAIScore) return;
+
+  const hasMargin  = _lastMargin != null;
+  const fundWeight = hasMargin ? 0.55 : 0.30;
+  const simWeight  = hasMargin ? 0.45 : 0.70;
+
+  const total = _lastSimScore
+    ? Math.round(_lastAIScore.total * fundWeight + _lastSimScore.total * simWeight)
+    : _lastAIScore.total;
+
+  const color   = total >= 70 ? '#66bb6a' : total >= 45 ? '#ffee58' : '#ef5350';
+  const verdict = total >= 70 ? 'BUY'     : total >= 45 ? 'HOLD'    : 'AVOID';
+
+  const ftColor = _lastAIScore.verdict === 'BUY' ? '#66bb6a'
+                : _lastAIScore.verdict === 'HOLD' ? '#ffee58' : '#ef5350';
+  const scColor = !_lastSimScore ? '#888'
+                : _lastSimScore.verdict === 'FAVORABIL' ? '#66bb6a'
+                : _lastSimScore.verdict === 'NEUTRU'    ? '#ffee58' : '#ef5350';
+
+  const tipHtml = `
+    <strong style="color:${color}">📊 Scor Final Ponderat</strong>
+    <div style="margin-top:5px;font-size:10.5px;color:rgba(255,255,255,0.6)">
+      Media ponderată a scorului Fundamental+Tehnic și a scorului Simulare:
+    </div>
+    <div class="tip-scale" style="margin-top:6px">
+      <div class="tip-scale-row">
+        <span class="tip-dot" style="background:${ftColor}"></span>
+        Fund+Tehnic: <strong style="color:${ftColor}">${_lastAIScore.total}/100 ${_lastAIScore.verdict}</strong>
+        &nbsp;·&nbsp;<em>${(fundWeight*100).toFixed(0)}%</em>
+      </div>
+      ${_lastSimScore
+        ? `<div class="tip-scale-row">
+             <span class="tip-dot" style="background:${scColor}"></span>
+             Simulare: <strong style="color:${scColor}">${_lastSimScore.total}/100 ${_lastSimScore.verdict}</strong>
+             &nbsp;·&nbsp;<em>${(simWeight*100).toFixed(0)}%</em>
+           </div>`
+        : `<div class="tip-scale-row">
+             <span class="tip-dot" style="background:#888"></span>
+             Simulare: <em style="color:#888">rulează simularea mai întâi</em>
+           </div>`
+      }
+    </div>
+    ${!hasMargin ? '<div style="margin-top:5px;font-size:10px;color:rgba(255,167,38,0.8)">⚠ Fără date fundamentale — simularea are pondere 70%</div>' : ''}
+    <span class="tip-impact">Fund+Tehnic ${(fundWeight*100).toFixed(0)}% · Simulare ${(simWeight*100).toFixed(0)}%</span>`;
+
+  el.innerHTML = `
+    <span class="tip-wrap">
+      <span style="display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:24px;
+                   border:1px solid ${color}55;background:${color}12;line-height:1;cursor:default">
+        <span style="color:${color};font-size:22px;font-weight:900;line-height:1">${total}</span>
+        <span style="color:rgba(255,255,255,0.3);font-size:11px">/100</span>
+        <span style="color:${color};font-size:14px;font-weight:800;letter-spacing:1px">${verdict}</span>
+      </span>
+      <i class="tip-icon" style="border-color:${color};color:${color};background:transparent;
+         width:16px;height:16px;font-size:10px">i</i>
+      <div class="tip-bubble" style="width:270px">${tipHtml}</div>
+    </span>`;
+  el.style.display      = 'inline-flex';
+  el.style.alignItems   = 'center';
+}
+
+// ── Apelat din app.js dupa simulare ──────────────────
+export function updateSimScoreDisplay({ sigma, garch, nu, drift, vixData, ivData, volumeTrend }) {
+  _lastSimScore = calcSimScore({ sigma, garch, nu, drift, vixData, ivData, volumeTrend });
+
+  const el = document.getElementById('sim-score-inline');
+  if (el) {
+    const { total, verdict, driftScore, sigmaScore, garchScore, nuScore,
+            vixScore, ivScore, skewScore, volScore } = _lastSimScore;
+    const c = verdict === 'FAVORABIL' ? '#66bb6a' : verdict === 'NEUTRU' ? '#ffee58' : '#ef5350';
+    function dot(s) { return `<span class="tip-dot" style="background:${s>=65?'#66bb6a':s>=42?'#ffee58':'#ef5350'}"></span>`; }
+    el.innerHTML = `
+      <span class="tip-wrap">
+        <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:12px;
+                     border:1px solid ${c}44;background:${c}10;font-size:11px;font-weight:700;cursor:default">
+          <span style="color:${c};font-weight:800">${total}</span>
+          <span style="color:rgba(255,255,255,0.3);font-size:9px">/100</span>
+          <span style="color:${c}">${verdict}</span>
+        </span>
+        <i class="tip-icon" style="border-color:${c};color:${c};background:transparent">i</i>
+        <div class="tip-bubble" style="width:260px">
+          <strong style="color:${c}">🎲 Scor Simulare Monte Carlo</strong>
+          <div style="margin-top:5px;font-size:10.5px;color:rgba(255,255,255,0.55)">
+            Calculat din parametrii statistici ai simularii:
+          </div>
+          <div class="tip-scale" style="margin-top:5px">
+            <div class="tip-scale-row">${dot(driftScore)} Drift anual &nbsp;— ${driftScore}/100 · 20%</div>
+            <div class="tip-scale-row">${dot(sigmaScore)} Sigma/vol &nbsp;&nbsp;— ${sigmaScore}/100 · 20%</div>
+            <div class="tip-scale-row">${dot(garchScore)} GARCH persist — ${garchScore}/100 · 15%</div>
+            <div class="tip-scale-row">${dot(nuScore)} Cozi Student-t — ${nuScore}/100 · 15%</div>
+            <div class="tip-scale-row">${dot(vixScore)} VIX piata &nbsp;&nbsp;— ${vixScore}/100 · 10%</div>
+            <div class="tip-scale-row">${dot(ivScore)} IV vs sigma &nbsp;— ${ivScore}/100 · 10%</div>
+            <div class="tip-scale-row">${dot(skewScore)} Skew put/call — ${skewScore}/100 · 5%</div>
+            <div class="tip-scale-row">${dot(volScore)} Trend volum &nbsp;— ${volScore}/100 · 5%</div>
+          </div>
+        </div>
+      </span>`;
+    el.style.display = 'inline-flex';
+    el.style.alignItems = 'center';
+  }
+
+  if (_lastAIScore) _updateCombinedInline();
+}
 
 function calcAIScore(margin, deviationPct) {
   // Fund score din marja de siguranta fundamentala
@@ -647,23 +797,21 @@ function generateFundamentalComment(weighted, curPrice, margin, sym) {
       </div>`;
   }
 
-  // ── Populate inline score next to company name ───────
-  const scoreInlineEl = document.getElementById('val-score-inline');
-  if (scoreInlineEl) {
-    scoreInlineEl.innerHTML = `
-      <span style="display:inline-flex;align-items:center;gap:5px;
-                   padding:3px 10px 3px 8px; border-radius:20px;
-                   border:1px solid ${vc}44; background:${vc}10;
-                   font-size:12px; font-weight:700; line-height:1;">
-        <span style="color:${vc};font-size:15px;font-weight:800">${ai.total}</span>
-        <span style="color:rgba(255,255,255,0.35);font-size:10px">/100</span>
-        <span style="color:${vc};letter-spacing:0.8px">${ai.verdict}</span>
-      </span>`;
-    scoreInlineEl.style.display = 'inline-flex';
-  }
+  // ── Actualizeaza scorul combinat langa numele firmei ─
+  _lastMargin = margin;
+  _updateCombinedInline();
 
   return `
-    <div class="vfc-title">📋 Analiză Fundamentală + Timing Tehnic</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;">
+      <div class="vfc-title" style="margin-bottom:0">📋 Analiză Fundamentală + Timing Tehnic</div>
+      <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:12px;
+                   border:1px solid ${vc}44;background:${vc}10;font-size:11px;font-weight:700;
+                   flex-shrink:0;white-space:nowrap">
+        <span style="color:${vc};font-weight:800">${ai.total}</span>
+        <span style="color:rgba(255,255,255,0.3);font-size:9px">/100</span>
+        <span style="color:${vc}">${ai.verdict}</span>
+      </span>
+    </div>
     <div class="vfc-row">
       <span style="color:${fundColor};font-weight:600">${fundLabel}</span>
     </div>
