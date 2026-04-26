@@ -7,7 +7,7 @@ import { calcParams, simulate, calcStats, percentilesPerDay,
          adjustParams, NUM_SIMS, estimateGARCH, estimateNu } from './montecarlo.js';
 import { analyzeSentiment, fetchSectorData, fetchVIX }        from './sentiment.js';
 import { drawPriceHistory, drawSentiment, destroyAll, destroyPeriodCharts } from './charts.js';
-import { fetchStockData, fetchImpliedVolatility, blendSigma }  from './api.js';
+import { fetchStockData, fetchImpliedVolatility, fetchProxyIV, blendSigma } from './api.js';
 import { $, fmt, setStatus, showSection,
          setPillColor, renderSectorBadge, renderPeriod }       from './ui.js';
 import { loadIstoric, saveIstoric, loadWatchlist,
@@ -186,7 +186,16 @@ async function runSimulation() {
       }
     }
 
-    // ── Fallback: IV estimat din VIX ─────────────────
+    // ── Fallback 1: IV prin proxy Render (Yahoo fara CORS) ──
+    if (!ivData) {
+      setStatus('IV: incerc prin proxy...');
+      try {
+        ivData = await fetchProxyIV(ticker, currentPrice);
+        if (ivData) setStatus(`IV: proxy ✓ — ${(ivData.ivAnnual * 100).toFixed(1)}%/an`);
+      } catch (_) {}
+    }
+
+    // ── Fallback 2: IV estimat din VIX ───────────────
     let ivEstimated = false;
     if (!ivData) {
       setStatus('IV: calculez estimat din VIX + caracteristici actiune...');
