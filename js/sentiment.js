@@ -254,7 +254,7 @@ const TICKER_SECTOR_MAP = {
   'ASML.AS':  { sector: 'Technology',           industry: 'Semiconductor Equipment & Materials' },
   'VPK.AS':   { sector: 'Energy',               industry: 'Oil & Gas Integrated' },
   'ECMPA.AS': { sector: 'Real Estate',          industry: 'REIT — Specialty' },
-  'LIGHT.AS': { sector: 'Industrials',          industry: 'Electrical Equipment & Parts' },
+  //'LIGHT.AS': { sector: 'Industrials',          industry: 'Electrical Equipment & Parts' },
   'PHIA.AS':  { sector: 'Healthcare',           industry: 'Medical Devices' },
   'HEIA.AS':  { sector: 'Consumer Defensive',   industry: 'Beverages — Alcoholic' },
   'INGA.AS':  { sector: 'Financial Services',   industry: 'Banks — Diversified' },
