@@ -327,6 +327,23 @@ async function _fetchFinnhub(ticker) {
   return { eps, pe, fcfPerShare, growth, shares, totalAssets, cash: cashFH, debt: debtFH };
 }
 
+// ── Sector via proxy Render (yfinance server-side) ───────
+export async function fetchProxySector(ticker) {
+  if (!MY_PROXY) return null;
+  try {
+    const r = await fetch(
+      `${MY_PROXY}/sector/${encodeURIComponent(ticker)}`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    if (!r.ok) return null;
+    const p = await r.json();
+    if (!p?.sector) return null;
+    return { sector: p.sector, industry: p.industry || p.sector };
+  } catch (_) {
+    return null;
+  }
+}
+
 // ── Sector din Finnhub profile2 — fallback pt tickere EU ─
 export async function fetchFinnhubSector(ticker) {
   if (!FINNHUB_KEY) return null;
