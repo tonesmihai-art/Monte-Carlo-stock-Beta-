@@ -341,11 +341,14 @@ export async function fetchSectorData(ticker) {
   // Fallback final: Finnhub profile2 (pt tickere EU blocate de Yahoo)
   try {
     const fhResult = await fetchFinnhubSector(ticker);
+    console.log('[Finnhub sector]', ticker, '→', fhResult);
     if (fhResult && fhResult.sector && fhResult.sector !== 'Unknown') {
       const weights = SECTOR_WEIGHTS[fhResult.sector] || SECTOR_WEIGHTS['Unknown'];
       return { sector: fhResult.sector, industry: fhResult.industry, weights };
     }
-  } catch (_) {}
+  } catch (e) {
+    console.warn('[Finnhub sector] eroare:', e.message);
+  }
 
   return { sector: 'Unknown', industry: 'Unknown', weights: SECTOR_WEIGHTS['Unknown'] };
 }
