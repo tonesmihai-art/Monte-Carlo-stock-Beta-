@@ -75,7 +75,7 @@ export function renderSectorBadge(sector, industry, vixData, weights) {
           : 'Piata in <strong style="color:#ef5350">panica</strong> — sigma creste +40% in simulare.';
 
   el.innerHTML = `
-    <span class="tip-wrap">
+    ${sector ? `<span class="tip-wrap">
       <span class="sector-chip">${emoji} ${sector}</span>
       <i class="tip-icon" style="border-color:rgba(79,195,247,0.4)">i</i>
       <div class="tip-bubble">
@@ -89,7 +89,7 @@ export function renderSectorBadge(sector, industry, vixData, weights) {
         </div>
         <span class="tip-impact">Influenteaza: ponderile sentimentului AI</span>
       </div>
-    </span>
+    </span>` : ''}
     <span class="tip-wrap">
       <span class="vix-chip" style="color:${vixColor}">
         VIX: ${vixData?.vix ?? 'N/A'} ${vixData?.vixLabel ?? ''}
