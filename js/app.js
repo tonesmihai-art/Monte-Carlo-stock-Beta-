@@ -170,10 +170,15 @@ async function runSimulation() {
       _lastVixData = vixData;
       if (sectorResult.status === 'fulfilled') {
         _lastSectorWeights = sectorResult.value.weights;
-        initValuarePanel(currentPrice, currency, sectorResult.value.sector, ticker, fundamentals,
+        const detectedSector = sectorResult.value.sector;
+        initValuarePanel(currentPrice, currency, detectedSector, ticker, fundamentals,
                          { deviationPct, drift, sigma, mean50 });
+        // Arata sectorul in badge doar daca a fost detectat; altfel doar VIX
         const valKey = $('val-sector')?.value || 'tech';
-        renderSectorBadge(VAL_SECTOR_DISPLAY[valKey] || valKey,
+        const displaySector = (detectedSector && detectedSector !== 'Unknown')
+          ? (VAL_SECTOR_DISPLAY[valKey] || valKey)
+          : null;
+        renderSectorBadge(displaySector,
                           sectorResult.value.industry, vixData, sectorResult.value.weights);
       } else {
         initValuarePanel(currentPrice, currency, null, ticker, fundamentals,
