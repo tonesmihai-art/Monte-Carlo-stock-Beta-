@@ -336,8 +336,10 @@ export async function fetchFinnhubSector(ticker) {
       `https://finnhub.io/api/v1/stock/profile2?symbol=${fhTicker}&token=${FINNHUB_KEY}`,
       { signal: AbortSignal.timeout(7000) }
     );
+    console.log('[Finnhub raw] status:', r.status, 'ticker:', fhTicker);
     if (!r.ok) return null;
     const p = await r.json();
+    console.log('[Finnhub raw] raspuns:', JSON.stringify(p).slice(0, 300));
     if (!p?.finnhubIndustry) return null;
     // Mapeaza industria Finnhub → sector Yahoo-style
     const ind = p.finnhubIndustry.toLowerCase();
@@ -805,5 +807,4 @@ export async function fetchValuationFundamentals(ticker) {
   };
   if (Object.values(result).filter(v => v !== result.sources).every(v => v == null)) throw new Error('Date indisponibile');
   return result;
-  
 }
