@@ -647,6 +647,21 @@ function generateFundamentalComment(weighted, curPrice, margin, sym) {
       </div>`;
   }
 
+  // ── Populate inline score next to company name ───────
+  const scoreInlineEl = document.getElementById('val-score-inline');
+  if (scoreInlineEl) {
+    scoreInlineEl.innerHTML = `
+      <span style="display:inline-flex;align-items:center;gap:5px;
+                   padding:3px 10px 3px 8px; border-radius:20px;
+                   border:1px solid ${vc}44; background:${vc}10;
+                   font-size:12px; font-weight:700; line-height:1;">
+        <span style="color:${vc};font-size:15px;font-weight:800">${ai.total}</span>
+        <span style="color:rgba(255,255,255,0.35);font-size:10px">/100</span>
+        <span style="color:${vc};letter-spacing:0.8px">${ai.verdict}</span>
+      </span>`;
+    scoreInlineEl.style.display = 'inline-flex';
+  }
+
   return `
     ${scoreBadgeHtml}
     <div class="vfc-title">📋 Analiză Fundamentală + Timing Tehnic</div>
