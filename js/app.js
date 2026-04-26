@@ -171,6 +171,7 @@ async function runSimulation() {
       if (sectorResult.status === 'fulfilled') {
         _lastSectorWeights = sectorResult.value.weights;
         const detectedSector = sectorResult.value.sector;
+        console.log('[Sector]', ticker, '→ sector:', detectedSector, '| industry:', sectorResult.value.industry);
         initValuarePanel(currentPrice, currency, detectedSector, ticker, fundamentals,
                          { deviationPct, drift, sigma, mean50 });
         // Arata sectorul in badge doar daca a fost detectat; altfel doar VIX
@@ -518,5 +519,4 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSectorBadge(VAL_SECTOR_DISPLAY[valKey] || valKey,
                       null, _lastVixData, _lastSectorWeights);
   });
-         
 });
