@@ -177,4 +177,5 @@ export function renderPeriod(periodData) {
     drawTrajectories(canvasTraj, percs, percsAdj, days, currentPrice, ticker);
     drawHistogram(canvasHist, stats, statsAdj, currentPrice, days);
   });
+  
 }
