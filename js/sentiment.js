@@ -6,7 +6,7 @@
 //  + Detectie sector + VIX
 // ─────────────────────────────────────────────────────
 
-import { fetchFinnhubSector } from './api.js';
+import { fetchFinnhubSector, fetchProxySector } from './api.js';
 
 // Lexicon VADER simplificat (cuvinte financiare + general)
 const VADER_LEXICON = {
@@ -338,17 +338,23 @@ export async function fetchSectorData(ticker) {
     }
   } catch (_) {}
 
-  // Fallback final: Finnhub profile2 (pt tickere EU blocate de Yahoo)
+  // Fallback: proxy Render cu yfinance (functioneaza pentru EU)
+  try {
+    const pxResult = await fetchProxySector(ticker);
+    if (pxResult && pxResult.sector) {
+      const weights = SECTOR_WEIGHTS[pxResult.sector] || SECTOR_WEIGHTS['Unknown'];
+      return { sector: pxResult.sector, industry: pxResult.industry, weights };
+    }
+  } catch (_) {}
+
+  // Fallback final: Finnhub profile2 (pt tickere US necunoscute)
   try {
     const fhResult = await fetchFinnhubSector(ticker);
-    console.log('[Finnhub sector]', ticker, '→', fhResult);
     if (fhResult && fhResult.sector && fhResult.sector !== 'Unknown') {
       const weights = SECTOR_WEIGHTS[fhResult.sector] || SECTOR_WEIGHTS['Unknown'];
       return { sector: fhResult.sector, industry: fhResult.industry, weights };
     }
-  } catch (e) {
-    console.warn('[Finnhub sector] eroare:', e.message);
-  }
+  } catch (_) {}
 
   return { sector: 'Unknown', industry: 'Unknown', weights: SECTOR_WEIGHTS['Unknown'] };
 }
