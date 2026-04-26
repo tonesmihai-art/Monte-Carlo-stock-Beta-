@@ -240,7 +240,7 @@ input[type=text]:focus { border-color: var(--blue); }
   display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
 }
 
-.stock-name  { font-family: var(--font-sans); font-size: 16px; font-weight: 700; }
+.stock-name  { font-family: var(--font-sans); font-size: 32px; font-weight: 700; }
 .stock-ticker { color: var(--gray); font-size: 11px; letter-spacing: 2px; }
 .stock-price { font-size: 22px; font-weight: 700; color: var(--green); margin-left: auto; font-family: var(--font-sans); }
 
@@ -407,36 +407,3 @@ input[type=text]:focus { border-color: var(--blue); }
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-/* ── REIT câmpuri speciale ─────────────────────────── */
-.val-reit-field label { color: #4fc3f7; }
-.val-reit-field input { border-color: rgba(79,195,247,0.35) !important; }
-.val-reit-field input:focus { border-color: rgba(79,195,247,0.75) !important; }
-.val-field-tag {
-  display: inline-block;
-  font-size: 9px;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: rgba(79,195,247,0.15);
-  color: #4fc3f7;
-  margin-left: 4px;
-  vertical-align: middle;
-  letter-spacing: 0.5px;
-}
-.val-reit-info {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 0 4px;
-  margin-bottom: 2px;
-}
-.reit-badge {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid currentColor;
-  opacity: 0.9;
-}
