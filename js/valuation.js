@@ -663,7 +663,6 @@ function generateFundamentalComment(weighted, curPrice, margin, sym) {
   }
 
   return `
-    ${scoreBadgeHtml}
     <div class="vfc-title">📋 Analiză Fundamentală + Timing Tehnic</div>
     <div class="vfc-row">
       <span style="color:${fundColor};font-weight:600">${fundLabel}</span>
