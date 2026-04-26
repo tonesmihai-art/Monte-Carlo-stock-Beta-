@@ -18,6 +18,11 @@ const VAL_SECTOR_WEIGHTS = {
   tech:         { eps: 0.20, fcf: 0.15, nav: 0.10, dcf: 0.55 },
   reit:         { eps: 0.10, fcf: 0.35, nav: 0.40, dcf: 0.15 },
   shipping:     { eps: 0.20, fcf: 0.35, nav: 0.15, dcf: 0.30 },
+  // ── Sectoare noi ─────────────────────────────────────
+  healthcare:   { eps: 0.30, fcf: 0.20, nav: 0.05, dcf: 0.45 }, // Farma/sanatate: DCF + EPS dominante, book value irelevant
+  banci:        { eps: 0.35, fcf: 0.05, nav: 0.50, dcf: 0.10 }, // Banci: P/Book dominant, FCF neaplicabil
+  materiale:    { eps: 0.20, fcf: 0.30, nav: 0.25, dcf: 0.25 }, // Miniere/materiale: asset-heavy + ciclic
+  auto:         { eps: 0.20, fcf: 0.25, nav: 0.25, dcf: 0.30 }, // Auto: capex masiv, ciclic, toate metodele relevante
 };
 
 export const YAHOO_TO_VAL_SECTOR = {
@@ -25,14 +30,18 @@ export const YAHOO_TO_VAL_SECTOR = {
   'Communication Services': 'tech',
   'Energy':                 'energy',
   'Utilities':              'utilitati',
-  'Financial Services':     'asigurari',
+  'Financial Services':     'banci',
   'Insurance':              'asigurari',
   'Real Estate':            'reit',
   'Industrials':            'conglomerate',
-  'Healthcare':             'conglomerate',
-  'Basic Materials':        'conglomerate',
+  'Healthcare':             'healthcare',
+  'Basic Materials':        'materiale',
   'Consumer Defensive':     'consum',
   'Consumer Cyclical':      'consum',
+  // ── Mapari suplimentare Yahoo ─────────────────────────
+  'Consumer Discretionary': 'consum',
+  'Auto Manufacturers':     'auto',
+  'Automobiles':            'auto',
 };
 
 // ── Calcul valuare — 4 metode ─────────────────────────
