@@ -941,4 +941,5 @@ export async function analyzeSentiment(ticker, companyName, onProgress) {
       ? `Sentiment negativ (${negative}/7 factori bearish). Precautie recomandata pentru ${ticker} [${sector}].`
       : `Sentiment neutru pentru ${ticker} [${sector}]. Factori mixti sau lipsa de stiri semnificative.`,
   };
+  
 }
