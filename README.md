@@ -62,3 +62,6 @@ Pune-le in folderul `icons/`.
 ## ⚠️ Disclaimer
 
 Simulare matematica, nu sfat financiar.
+
+<img width="1080" height="1350" alt="WhatsApp Image 2026-04-27 at 07 29 18" src="https://github.com/user-attachments/assets/253fa0e7-6bf2-4f72-9dbb-b6d9abc2c8cf" />
+
