@@ -187,12 +187,11 @@ input[type=text]:focus { border-color: var(--blue); }
   display: flex;
   flex-direction: column;
 }
-.stock-bar        { order: 1; }
-.price-chart-box  { order: 2; }
-.period-tabs      { order: 3; }
-#chart-area       { order: 4; }
-#valuation-panel  { order: 5; }
-#sentiment-section { order: 6; }
+.stock-bar      { order: 1; }
+.price-chart-box { order: 2; }
+#valuation-panel { order: 3; }
+.period-tabs    { order: 4; }
+#chart-area     { order: 5; }
 /* comentariu fundamental — sub panelul de valuare */
 #val-fundamental-comment {
   background: linear-gradient(135deg, rgba(18,18,31,0.95) 0%, rgba(26,26,46,0.95) 100%);
@@ -238,7 +237,7 @@ input[type=text]:focus { border-color: var(--blue); }
   background: var(--panel);
   border: 1px solid var(--border); border-radius: 8px;
   padding: 16px 20px; margin-bottom: 20px;
-  display: flex; align-items: flex-end; gap: 24px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
 }
 
 .stock-name  { font-family: var(--font-sans); font-size: 32px; font-weight: 700; }
