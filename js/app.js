@@ -9,7 +9,8 @@ import { calcParams, simulate, calcStats, percentilesPerDay,
          percentilesPerDayOU, NUM_SIMS_OU } from './montecarlo.js';
 import { analyzeSentiment, fetchSectorData, fetchVIX }        from './sentiment.js';
 import { drawPriceHistory, drawSentiment, destroyAll, destroyPeriodCharts } from './charts.js';
-import { fetchStockData, fetchImpliedVolatility, fetchProxyIV, blendSigma } from './api.js';
+import { fetchStockData, fetchImpliedVolatility, fetchProxyIV, blendSigma,
+         fetchHestonCalibrated } from './api.js';
 import { $, fmt, setStatus, showSection,
          setPillColor, renderSectorBadge, renderPeriod }       from './ui.js';
 import { loadIstoric, saveIstoric, loadWatchlist,
@@ -164,10 +165,11 @@ async function runSimulation() {
     let sectorWeights = null;
     let vixData       = { vix: null, vixLabel: 'N/A', vixImpact: 0 };
     {
-      const [ivResult, sectorResult, vixResult] = await Promise.allSettled([
+      const [ivResult, sectorResult, vixResult, hestonResult] = await Promise.allSettled([
         fetchImpliedVolatility(ticker, currentPrice, msg => setStatus(msg)),
         fetchSectorData(ticker),
         fetchVIX(),
+        fetchHestonCalibrated(ticker, currentPrice, msg => setStatus(msg)),
       ]);
       if (ivResult.status === 'fulfilled')     ivData        = ivResult.value;
       if (sectorResult.status === 'fulfilled') sectorWeights = sectorResult.value.weights;
@@ -189,6 +191,23 @@ async function runSimulation() {
         initValuarePanel(currentPrice, currency, null, ticker, fundamentals,
                          { deviationPct, drift, sigma, mean50 });
       }
+    }
+
+    // ── Aplica parametrii Heston calibrati pe suprafata IV ──
+    // Suprascrie valorile estimate din OLS/GARCH cu parametrii calibrati pe optiuni reale.
+    // Pastreaza din OLS: kappaS, mu, muLog, halfLifeDays, sigmaOU (dinamica pret).
+    // Suprascrie cu calibrare: v0, kappav, theta, xi, rho (dinamica volatilitate).
+    if (hestonResult?.status === 'fulfilled' && hestonResult.value && ouParams) {
+      const h = hestonResult.value;
+      ouParams.v0     = h.v0;
+      ouParams.kappav = h.kappa;
+      ouParams.theta  = h.theta;
+      ouParams.xi     = h.xi;
+      ouParams.rho    = h.rho;
+      ouParams._hestonCalibrated = true;
+      ouParams._hestonRmse       = h.rmse;
+      ouParams._hestonNPoints    = h.nPoints;
+      ouParams._hestonNExpiries  = h.nExpiries;
     }
 
     // ── Fallback 1: IV prin proxy Render (Yahoo fara CORS) ──
