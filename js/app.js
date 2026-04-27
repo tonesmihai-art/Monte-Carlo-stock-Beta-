@@ -4,7 +4,9 @@
 // ─────────────────────────────────────────────────────
 
 import { calcParams, simulate, calcStats, percentilesPerDay,
-         adjustParams, NUM_SIMS, estimateGARCH, estimateNu } from './montecarlo.js';
+         adjustParams, NUM_SIMS, estimateGARCH, estimateNu,
+         estimateOUHeston, simulateOUHeston, calcStatsOU,
+         percentilesPerDayOU, NUM_SIMS_OU } from './montecarlo.js';
 import { analyzeSentiment, fetchSectorData, fetchVIX }        from './sentiment.js';
 import { drawPriceHistory, drawSentiment, destroyAll, destroyPeriodCharts } from './charts.js';
 import { fetchStockData, fetchImpliedVolatility, fetchProxyIV, blendSigma } from './api.js';
@@ -13,6 +15,7 @@ import { $, fmt, setStatus, showSection,
 import { loadIstoric, saveIstoric, loadWatchlist,
          saveToWatchlist, WATCHLIST_KEY }                      from './storage.js';
 import { initValuarePanel, generateQualityComment, updateSimScoreDisplay,
+         updateOUHestonDisplay,
          YAHOO_TO_VAL_SECTOR, getLastAIScore, getLastValResult } from './valuation.js';
 import { captureChartsForWatchlist, renderWatchlist,
          exportWatchlistHTML, importWatchlistFiles }           from './watchlist.js';
@@ -107,6 +110,8 @@ async function runSimulation() {
     // ── 2. Parametri GBM + GARCH(1,1) ───────────────
     setStatus('Calculez parametri GBM + GARCH(1,1)...');
     const { drift, sigma, mean50, deviationPct, volumeTrend, garch, nu } = calcParams(closes, volumes);
+    // ── Estimare parametri OU + Heston ───────────────
+    const ouParams = estimateOUHeston(closes, garch);
 
     const sigmaStaticPct = (sigma * 100).toFixed(3);
     const volAnualPct    = sigma * Math.sqrt(252) * 100;
@@ -350,17 +355,29 @@ async function runSimulation() {
         ? simulate(currentPrice, driftSkewed, sigmaBlended, days, driftAdjSkewed, sigmaAdjBlended, meanRevStrength, mean50, garch, nu)
         : null;
 
+      // ── Simulare OU + Heston paralela ───────────────
+      let ouStats = null, ouPercs = null;
+      if (ouParams) {
+        const matrixOU = simulateOUHeston(ouParams, currentPrice, days);
+        ouStats        = calcStatsOU(matrixOU, days, currentPrice);
+        ouPercs        = percentilesPerDayOU(matrixOU, days, [10, 50, 90], step);
+      }
+
       periodResults[days] = {
         days,
         stats:    calcStats(matrix, days, currentPrice),
         statsAdj: matrixAdj ? calcStats(matrixAdj, days, currentPrice) : null,
         percs:    percentilesPerDay(matrix, days, [10, 50, 90], step),
         percsAdj: matrixAdj ? percentilesPerDay(matrixAdj, days, [10, 50, 90], step) : null,
+        ouStats, ouPercs,
         currentPrice, currency, ticker,
       };
     }
 
     currentResult = { stock, periodResults, sentimentData, drift, sigma, driftAdj, sigmaAdj, garch, nu };
+
+    // ── Afiseaza rezultatele OU + Heston ─────────────
+    if (ouParams) updateOUHestonDisplay(ouParams, periodResults, currentPrice, currency);
 
     // ── 6. Salveaza istoric ───────────────────────────
     saveIstoric(ticker, `${currency} ${fmt(currentPrice)}`);
