@@ -243,7 +243,6 @@ export function blendSigma(sigmaHist, ivDaily, days) {
 //  Obtine cheia gratuita de pe https://finnhub.io/dashboard
 // ─────────────────────────────────────────────────────
 
-const FINNHUB_KEY = 'd7k8arpr01qn1u2gjttgd7k8arpr01qn1u2gjtu0';   // ← pune cheia ta aici (string)
 //const FMP_KEY     = 'U6KIewb4btX6jwjbChgY49mZxVHI30mG';   // ← pune cheia FMP (https://financialmodelingprep.com/developer/docs) — tier gratuit 250 req/zi
 
 // ── Proxy Python propriu (Render.com) — fallback final, fara CORS ──
@@ -251,80 +250,29 @@ const FINNHUB_KEY = 'd7k8arpr01qn1u2gjttgd7k8arpr01qn1u2gjtu0';   // ← pune ch
 // ex: 'https://monte-carlo-proxy.onrender.com'
 const MY_PROXY = 'https://monte-carlo-proxy.onrender.com';   // ← pune URL-ul dupa deploy
 
-// ── Convertor ticker Yahoo → Finnhub (pentru actiuni europene) ──
-// Yahoo:   ECMPA.AS  →  Finnhub: AMS:ECMPA
-// Yahoo:   BMW.DE    →  Finnhub: XETRA:BMW
-// Yahoo:   HSBA.L    →  Finnhub: LSE:HSBA
-function _toFinnhubTicker(ticker) {
-  const map = {
-    '.AS': 'AMS',    // Euronext Amsterdam
-    '.DE': 'XETRA',  // Deutsche Börse / Xetra
-    '.L':  'LSE',    // London Stock Exchange
-    '.PA': 'EPA',    // Euronext Paris
-    '.MI': 'BIT',    // Borsa Italiana
-    '.SW': 'SWX',    // SIX Swiss Exchange
-    '.BR': 'EBR',    // Euronext Brussels
-    '.LS': 'ELI',    // Euronext Lisbon
-    '.MC': 'BME',    // Bolsa de Madrid
-    '.HE': 'HEL',    // Nasdaq Helsinki
-    '.ST': 'STO',    // Nasdaq Stockholm
-    '.CO': 'CPH',    // Nasdaq Copenhagen
-    '.OL': 'OSL',    // Oslo Bors
-    '.VI': 'VIE',    // Wiener Börse
-  };
-  for (const [suffix, exchange] of Object.entries(map)) {
-    if (ticker.endsWith(suffix)) {
-      return `${exchange}:${ticker.slice(0, -suffix.length)}`;
-    }
-  }
-  return ticker; // US / fara sufix — ramane neschimbat
-}
-
+// ── Finnhub via proxy Render (cheia ramane pe server) ─
 async function _fetchFinnhub(ticker) {
-  if (!FINNHUB_KEY) return {};
+  if (!MY_PROXY) return {};
+  try {
+    const r = await fetch(
+      `${MY_PROXY}/finnhub/${encodeURIComponent(ticker)}`,
+      { signal: AbortSignal.timeout(12000) }
+    );
+    if (!r.ok) return {};
+    const d = await r.json();
 
-  const fhTicker = _toFinnhubTicker(ticker);   // conversie EU daca e cazul
-  const base = 'https://finnhub.io/api/v1';
-  const ctrl = (ms) => ({ signal: AbortSignal.timeout(ms) });
-
-  // Fetch paralel: metrics (EPS, PE, FCF, growth, bilant) + profile (shares)
-  const [metRes, profRes] = await Promise.allSettled([
-    fetch(`${base}/stock/metric?symbol=${fhTicker}&metric=all&token=${FINNHUB_KEY}`, ctrl(9000))
-      .then(r => r.ok ? r.json() : null),
-    fetch(`${base}/stock/profile2?symbol=${fhTicker}&token=${FINNHUB_KEY}`, ctrl(7000))
-      .then(r => r.ok ? r.json() : null),
-  ]);
-
-  const m = metRes.status  === 'fulfilled' ? metRes.value?.metric   : null;
-  const p = profRes.status === 'fulfilled' ? profRes.value           : null;
-
-  if (!m && !p) return {};
-
-  // ── EPS, PE ──────────────────────────────────────────
-  const eps = m?.epsTTM          ?? m?.epsAnnual          ?? null;
-  const pe  = m?.peTTM           ?? m?.peAnnual           ?? null;
-
-  // ── FCF per share ────────────────────────────────────
-  const fcfPerShare = m?.freeCashFlowPerShareTTM    ??
-                      m?.freeCashFlowPerShareAnnual  ?? null;
-
-  // ── Crestere — Finnhub returneaza deja in % (5.25 = 5.25%), NU multiplicam cu 100 ──
-  const growth = m?.epsGrowth3Y          != null ? m.epsGrowth3Y
-               : m?.revenueGrowth3Y      != null ? m.revenueGrowth3Y
-               : m?.revenueGrowthQuarterly != null ? m.revenueGrowthQuarterly
-               : null;
-
-  // ── Shares (profile2 returneaza in milioane direct) ──
-  const shares = p?.shareOutstanding ?? null;
-
-  // ── Bilant — Finnhub returneaza in milioane $ ────────
-  const toM = v => (v != null && isFinite(v)) ? v : null;
-
-  const totalAssets = toM(m?.totalAssets);
-  const cashFH      = toM(m?.cashAndEquivalents);
-  const debtFH      = toM(m?.totalDebt);
-
-  return { eps, pe, fcfPerShare, growth, shares, totalAssets, cash: cashFH, debt: debtFH };
+    const toM = v => (v != null && isFinite(v)) ? v : null;
+    return {
+      eps:         d.eps         ?? null,
+      pe:          d.pe          ?? null,
+      fcfPerShare: d.fcfPerShare ?? null,
+      growth:      d.growth      ?? null,
+      shares:      d.shares      ?? null,
+      totalAssets: toM(d.totalAssets),
+      cash:        toM(d.cash),
+      debt:        toM(d.debt),
+    };
+  } catch (_) { return {}; }
 }
 
 // ── Sector via proxy Render (yfinance server-side) ───────
@@ -365,40 +313,19 @@ export async function fetchProxySector(ticker) {
   }
 }
 
-// ── Sector din Finnhub profile2 — fallback pt tickere EU ─
+// ── Sector din Finnhub — prin proxy Render (cheia ramane pe server) ─
 export async function fetchFinnhubSector(ticker) {
-  if (!FINNHUB_KEY) return null;
-  const fhTicker = _toFinnhubTicker(ticker);
+  if (!MY_PROXY) return null;
   try {
     const r = await fetch(
-      `https://finnhub.io/api/v1/stock/profile2?symbol=${fhTicker}&token=${FINNHUB_KEY}`,
-      { signal: AbortSignal.timeout(7000) }
+      `${MY_PROXY}/finnhub/${encodeURIComponent(ticker)}`,
+      { signal: AbortSignal.timeout(9000) }
     );
     if (!r.ok) return null;
-    const p = await r.json();
-    if (!p?.finnhubIndustry) return null;
-    // Mapeaza industria Finnhub → sector Yahoo-style
-    const ind = p.finnhubIndustry.toLowerCase();
-    const sector =
-      /software|semiconductor|internet|electronic compon|tech|data|cloud|cyber|artificial|saas/.test(ind) ? 'Technology'
-    : /telecom|communication|media|broadcast|wireless/.test(ind)                                          ? 'Communication Services'
-    : /insurance/.test(ind)                                                                               ? 'Insurance'
-    : /bank|financial services|asset management|capital market|credit service/.test(ind)                 ? 'Financial Services'
-    : /reit|real estate/.test(ind)                                                                        ? 'Real Estate'
-    : /oil|gas|energy|petroleum|coal|pipeline|lng/.test(ind)                                             ? 'Energy'
-    : /utilit|electric power|water util|renewable/.test(ind)                                              ? 'Utilities'
-    : /drug|pharma|biotech|medical|hospital|health plan|diagnostics|life science/.test(ind)              ? 'Healthcare'
-    : /gold|silver|steel|mining|material|chemical|aluminum|copper|lithium/.test(ind)                     ? 'Basic Materials'
-    : /auto manufacturer|automobile|vehicle/.test(ind)                                                   ? 'Auto Manufacturers'
-    : /tobacco|cigarette/.test(ind)                                                                      ? 'Consumer Defensive'
-    : /food|beverage|grocery|consumer staple|household/.test(ind)                                        ? 'Consumer Defensive'
-    : /shipping|freight|marine|logistics|courier/.test(ind)                                              ? 'Industrials'
-    : /aerospace|defense|industrial|machinery|equipment|electrical|manufacture|construct/.test(ind)      ? 'Industrials'
-    : 'Unknown';
-    return { sector, industry: p.finnhubIndustry };
-  } catch (e) {
-    return null;
-  }
+    const d = await r.json();
+    if (!d?.sector && !d?.industry) return null;
+    return { sector: d.sector || 'Unknown', industry: d.industry || d.sector };
+  } catch (_) { return null; }
 }
 
 
