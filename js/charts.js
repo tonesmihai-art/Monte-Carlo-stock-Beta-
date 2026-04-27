@@ -79,7 +79,7 @@ export function drawPriceHistory(canvasId, dates, prices, ticker) {
 }
 
 // ── Grafic traiectorii (percentile) ──────────────────
-export function drawTrajectories(canvasId, percs, percAdj, days, currentPrice, ticker) {
+export function drawTrajectories(canvasId, percs, percAdj, days, currentPrice, ticker, ouPercs) {
   trajChart?.destroy();
   const labels = Array.from({ length: days + 1 }, (_, i) => i);
   const ctx    = document.getElementById(canvasId).getContext('2d');
@@ -127,6 +127,19 @@ export function drawTrajectories(canvasId, percs, percAdj, days, currentPrice, t
     });
   }
 
+  if (ouPercs) {
+    datasets.push({
+      label:       'P50 OU+Heston',
+      data:        Array.from(ouPercs[50]),
+      borderColor: 'rgba(206,147,216,0.85)',
+      borderWidth: 2,
+      borderDash:  [6, 3],
+      pointRadius: 0,
+      fill:        false,
+      tension:     0.3,
+    });
+  }
+
   datasets.push({
     label: `Pret curent $${currentPrice.toFixed(2)}`,
     data:  Array(days + 1).fill(currentPrice),
@@ -167,19 +180,20 @@ export function drawTrajectories(canvasId, percs, percAdj, days, currentPrice, t
 }
 
 // ── Histograma distributie finala ─────────────────────
-export function drawHistogram(canvasId, stats, statsAdj, currentPrice, days) {
+export function drawHistogram(canvasId, stats, statsAdj, currentPrice, days, ouStats) {
   histChart?.destroy();
   const ctx = document.getElementById(canvasId).getContext('2d');
 
-  // Construim bins manual
+  // Construim bins manual — range unificat GBM + OU
   const allFinals = Array.from(stats.finals);
-  const minVal    = stats.min * 0.95;
-  const maxVal    = stats.max * 1.05;
+  const minVal    = Math.min(stats.min, ouStats?.min ?? stats.min) * 0.95;
+  const maxVal    = Math.max(stats.max, ouStats?.max ?? stats.max) * 1.05;
   const nBins     = 60;
   const binSize   = (maxVal - minVal) / nBins;
 
   const bins      = Array(nBins).fill(0);
   const binsAdj   = Array(nBins).fill(0);
+  const binsOU    = Array(nBins).fill(0);
   const labels    = [];
 
   for (let i = 0; i < nBins; i++) {
@@ -198,15 +212,27 @@ export function drawHistogram(canvasId, stats, statsAdj, currentPrice, days) {
     });
   }
 
+  if (ouStats) {
+    // Normalizam OU la aceeasi scara ca GBM (diferenta de NUM_SIMS)
+    const gbmTotal = allFinals.length;
+    const ouTotal  = ouStats.finals.length;
+    const scale    = gbmTotal / ouTotal;
+    Array.from(ouStats.finals).forEach(v => {
+      const b = Math.min(Math.floor((v - minVal) / binSize), nBins - 1);
+      if (b >= 0) binsOU[b] += scale;
+    });
+  }
+
   // Culori per bin: verde=profit, rosu=pierdere
   const bgColors    = labels.map(l => parseFloat(l) >= currentPrice ? COLORS.green   : COLORS.red);
   const bgColorsAdj = labels.map(l => parseFloat(l) >= currentPrice ? COLORS.greenAI : COLORS.blueAI);
 
   const datasets = [{
-    label:           'Clasic',
+    label:           'GBM+GARCH',
     data:            bins,
     backgroundColor: bgColors,
     borderWidth:     0,
+    order: 2,
   }];
 
   if (statsAdj) {
@@ -215,6 +241,22 @@ export function drawHistogram(canvasId, stats, statsAdj, currentPrice, days) {
       data:            binsAdj,
       backgroundColor: bgColorsAdj,
       borderWidth:     0,
+      order: 3,
+    });
+  }
+
+  if (ouStats) {
+    datasets.push({
+      label:       'OU+Heston',
+      data:        binsOU,
+      type:        'line',
+      borderColor: 'rgba(206,147,216,0.85)',
+      borderWidth: 2,
+      borderDash:  [5, 3],
+      pointRadius: 0,
+      fill:        false,
+      tension:     0.4,
+      order: 1,
     });
   }
 
