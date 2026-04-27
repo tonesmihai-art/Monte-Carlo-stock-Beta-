@@ -501,9 +501,10 @@ let _techCtx = {};
 let _lastAIScore  = null;
 export function getLastAIScore() { return _lastAIScore; }
 
-// ── Scor simulare + marja stocate pentru scorul final ─
+// ── Scor simulare + marja + OU stocate pentru scorul final ─
 let _lastSimScore = null;
 let _lastMargin   = null;
+let _lastOUScore  = null;
 
 // ── Ultimul rezultat al calcului de valuare ───────────
 let _lastValResult = null;
@@ -553,48 +554,67 @@ function _updateCombinedInline() {
   const el = document.getElementById('val-score-inline');
   if (!el || !_lastAIScore) return;
 
-  const hasMargin  = _lastMargin != null;
-  const fundWeight = hasMargin ? 0.55 : 0.30;
-  const simWeight  = hasMargin ? 0.45 : 0.70;
+  const hasMargin = _lastMargin != null;
+  const hasOU     = _lastOUScore != null;
+  const hasSim    = _lastSimScore != null;
 
-  const total = _lastSimScore
-    ? Math.round(_lastAIScore.total * fundWeight + _lastSimScore.total * simWeight)
-    : _lastAIScore.total;
+  // ── Ponderi pe 3 componente ────────────────────────
+  let wFund, wSim, wOU;
+  if (hasMargin && hasOU) {
+    wFund = 0.45; wSim = 0.35; wOU = 0.20;
+  } else if (hasMargin && !hasOU) {
+    wFund = 0.55; wSim = hasSim ? 0.45 : 1.00; wOU = 0;
+  } else if (!hasMargin && hasOU) {
+    wFund = 0.25; wSim = 0.45; wOU = 0.30;
+  } else {
+    wFund = 0.30; wSim = hasSim ? 0.70 : 1.00; wOU = 0;
+  }
+
+  let total = _lastAIScore.total * wFund;
+  if (hasSim) total += _lastSimScore.total  * wSim;
+  if (hasOU)  total += _lastOUScore.total   * wOU;
+  total = Math.round(total);
 
   const color   = total >= 70 ? '#66bb6a' : total >= 45 ? '#ffee58' : '#ef5350';
   const verdict = total >= 70 ? 'BUY'     : total >= 45 ? 'HOLD'    : 'AVOID';
 
-  const ftColor = _lastAIScore.verdict === 'BUY' ? '#66bb6a'
+  const ftColor = _lastAIScore.verdict === 'BUY'  ? '#66bb6a'
                 : _lastAIScore.verdict === 'HOLD' ? '#ffee58' : '#ef5350';
-  const scColor = !_lastSimScore ? '#888'
+  const scColor = !hasSim ? '#888'
                 : _lastSimScore.verdict === 'FAVORABIL' ? '#66bb6a'
                 : _lastSimScore.verdict === 'NEUTRU'    ? '#ffee58' : '#ef5350';
+  const ouColor = !hasOU ? '#888'
+                : _lastOUScore.total >= 70 ? '#66bb6a'
+                : _lastOUScore.total >= 45 ? '#ffee58' : '#ef5350';
 
   const tipHtml = `
     <strong style="color:${color}">📊 Scor Final Ponderat</strong>
     <div style="margin-top:5px;font-size:10.5px;color:rgba(255,255,255,0.6)">
-      Media ponderată a scorului Fundamental+Tehnic și a scorului Simulare:
+      Medie ponderată din toate cele 3 surse de analiză:
     </div>
     <div class="tip-scale" style="margin-top:6px">
       <div class="tip-scale-row">
         <span class="tip-dot" style="background:${ftColor}"></span>
         Fund+Tehnic: <strong style="color:${ftColor}">${_lastAIScore.total}/100 ${_lastAIScore.verdict}</strong>
-        &nbsp;·&nbsp;<em>${(fundWeight*100).toFixed(0)}%</em>
+        &nbsp;·&nbsp;<em>${(wFund*100).toFixed(0)}%</em>
       </div>
-      ${_lastSimScore
-        ? `<div class="tip-scale-row">
-             <span class="tip-dot" style="background:${scColor}"></span>
-             Simulare: <strong style="color:${scColor}">${_lastSimScore.total}/100 ${_lastSimScore.verdict}</strong>
-             &nbsp;·&nbsp;<em>${(simWeight*100).toFixed(0)}%</em>
-           </div>`
-        : `<div class="tip-scale-row">
-             <span class="tip-dot" style="background:#888"></span>
-             Simulare: <em style="color:#888">rulează simularea mai întâi</em>
-           </div>`
-      }
+      <div class="tip-scale-row">
+        <span class="tip-dot" style="background:${scColor}"></span>
+        GBM Simulare: ${hasSim
+          ? `<strong style="color:${scColor}">${_lastSimScore.total}/100 ${_lastSimScore.verdict}</strong>`
+          : `<em style="color:#888">rulează simularea</em>`}
+        &nbsp;·&nbsp;<em>${(wSim*100).toFixed(0)}%</em>
+      </div>
+      <div class="tip-scale-row">
+        <span class="tip-dot" style="background:${ouColor}"></span>
+        OU+Heston: ${hasOU
+          ? `<strong style="color:${ouColor}">${_lastOUScore.total}/100</strong>`
+          : `<em style="color:#888">—</em>`}
+        &nbsp;·&nbsp;<em>${(wOU*100).toFixed(0)}%</em>
+      </div>
     </div>
-    ${!hasMargin ? '<div style="margin-top:5px;font-size:10px;color:rgba(255,167,38,0.8)">⚠ Fără date fundamentale — simularea are pondere 70%</div>' : ''}
-    <span class="tip-impact">Fund+Tehnic ${(fundWeight*100).toFixed(0)}% · Simulare ${(simWeight*100).toFixed(0)}%</span>`;
+    ${!hasMargin ? '<div style="margin-top:5px;font-size:10px;color:rgba(255,167,38,0.8)">⚠ Fără date fundamentale — simulările au pondere mai mare</div>' : ''}
+    <span class="tip-impact">Fund ${(wFund*100).toFixed(0)}% · GBM ${(wSim*100).toFixed(0)}% · OU+H ${(wOU*100).toFixed(0)}%</span>`;
 
   el.innerHTML = `
     <span class="tip-wrap">
@@ -606,10 +626,10 @@ function _updateCombinedInline() {
       </span>
       <i class="tip-icon" style="border-color:${color};color:${color};background:transparent;
          width:16px;height:16px;font-size:10px">i</i>
-      <div class="tip-bubble" style="width:270px">${tipHtml}</div>
+      <div class="tip-bubble" style="width:280px">${tipHtml}</div>
     </span>`;
-  el.style.display      = 'inline-flex';
-  el.style.alignItems   = 'center';
+  el.style.display    = 'inline-flex';
+  el.style.alignItems = 'center';
 }
 
 // ── Apelat din app.js dupa simulare ──────────────────
@@ -1121,6 +1141,10 @@ export function updateOUHestonDisplay(ouParams, periodResults, currentPrice, cur
   const convLabel = convScore >= 70 ? 'Mean reversion puternic'
                   : convScore >= 45 ? 'Mean reversion moderat'
                   : 'Revenire lenta — proces aproape de random walk';
+
+  // ── Stocheaza si actualizeaza scorul combinat ────────
+  _lastOUScore = { total: convScore, verdict: convLabel };
+  _updateCombinedInline();
 
   // ── Parametru κ_S in pill ────────────────────────────
   const pillKappa = document.getElementById('pill-kappa');
