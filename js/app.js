@@ -20,6 +20,8 @@ import { initValuarePanel, generateQualityComment, updateSimScoreDisplay,
          YAHOO_TO_VAL_SECTOR, getLastAIScore, getLastValResult } from './valuation.js';
 import { captureChartsForWatchlist, renderWatchlist,
          exportWatchlistHTML, importWatchlistFiles }           from './watchlist.js';
+import { initDB, saveSimulation }                              from './db.js';
+import { initCompareSection, renderCompareList }               from './compare.js';
 
 // ── Service Worker ────────────────────────────────────
 if ('serviceWorker' in navigator) {
@@ -402,6 +404,19 @@ async function runSimulation() {
     saveIstoric(ticker, `${currency} ${fmt(currentPrice)}`);
     renderIstoric();
 
+    // ── 6b. Salveaza in SQLite ────────────────────────
+    saveSimulation({
+      stock, periodResults, sentimentData, drift, sigma, nu, garch,
+      extra: {
+        ivAnnual:     ivData?.ivAnnual      ?? null,
+        skew:         ivData?.skewData?.skew ?? null,
+        vix:          vixData?.vix           ?? null,
+        deviationPct,
+        volTrend:     volumeTrend?.label     ?? null,
+        valuation:    getLastValResult()     ?? null,
+      },
+    }).catch(e => console.warn('DB save error:', e));
+
     // ── Buton Adauga la urmarit ───────────────────────
     const saveBtn = $('save-watchlist-btn');
     if (saveBtn) {
@@ -533,6 +548,8 @@ async function runSimulation() {
 document.addEventListener('DOMContentLoaded', () => {
   renderIstoric();
   renderWatchlist();
+  initDB().catch(e => console.warn('DB init error:', e));
+  initCompareSection();
   $('run-btn').addEventListener('click', runSimulation);
   $('ticker-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') runSimulation();
