@@ -191,23 +191,23 @@ async function runSimulation() {
         initValuarePanel(currentPrice, currency, null, ticker, fundamentals,
                          { deviationPct, drift, sigma, mean50 });
       }
-    }
 
-    // ── Aplica parametrii Heston calibrati pe suprafata IV ──
-    // Suprascrie valorile estimate din OLS/GARCH cu parametrii calibrati pe optiuni reale.
-    // Pastreaza din OLS: kappaS, mu, muLog, halfLifeDays, sigmaOU (dinamica pret).
-    // Suprascrie cu calibrare: v0, kappav, theta, xi, rho (dinamica volatilitate).
-    if (hestonResult?.status === 'fulfilled' && hestonResult.value && ouParams) {
-      const h = hestonResult.value;
-      ouParams.v0     = h.v0;
-      ouParams.kappav = h.kappa;
-      ouParams.theta  = h.theta;
-      ouParams.xi     = h.xi;
-      ouParams.rho    = h.rho;
-      ouParams._hestonCalibrated = true;
-      ouParams._hestonRmse       = h.rmse;
-      ouParams._hestonNPoints    = h.nPoints;
-      ouParams._hestonNExpiries  = h.nExpiries;
+      // ── Aplica parametrii Heston calibrati pe suprafata IV ──
+      // Suprascrie valorile estimate din OLS/GARCH cu parametrii calibrati pe optiuni reale.
+      // Pastreaza din OLS: kappaS, mu, muLog, halfLifeDays, sigmaOU (dinamica pret).
+      // Suprascrie cu calibrare: v0, kappav, theta, xi, rho (dinamica volatilitate).
+      if (hestonResult?.status === 'fulfilled' && hestonResult.value && ouParams) {
+        const h = hestonResult.value;
+        ouParams.v0     = h.v0;
+        ouParams.kappav = h.kappa;
+        ouParams.theta  = h.theta;
+        ouParams.xi     = h.xi;
+        ouParams.rho    = h.rho;
+        ouParams._hestonCalibrated = true;
+        ouParams._hestonRmse       = h.rmse;
+        ouParams._hestonNPoints    = h.nPoints;
+        ouParams._hestonNExpiries  = h.nExpiries;
+      }
     }
 
     // ── Fallback 1: IV prin proxy Render (Yahoo fara CORS) ──
