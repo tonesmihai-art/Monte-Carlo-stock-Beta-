@@ -459,8 +459,91 @@ window._applyAICorrections = function () {
   updateValuare();
 };
 
+// ── Parola AI Validator (SHA-256 encoded) ─────────────
+// Ca sa schimbi parola: calculeaza SHA-256 al noii parole si inlocuieste hash-ul de mai jos
+// ex: echo -n "noua_parola" | sha256sum
+const _AI_PASS_HASH = '81a83544cf93c245178cbc1620030f1123f435af867c79d87135983c52ab39d9';
+
+async function _sha256(text) {
+  const buf  = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function _showPasswordModal() {
+  return new Promise(resolve => {
+    // Overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position:fixed;inset:0;z-index:99999;
+      background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);
+      display:flex;align-items:center;justify-content:center;`;
+
+    overlay.innerHTML = `
+      <div style="background:#12121f;border:1px solid rgba(79,195,247,0.35);border-radius:14px;
+                  padding:28px 32px;width:320px;box-shadow:0 12px 40px rgba(0,0,0,0.7);">
+        <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:700;
+                    color:#4fc3f7;margin-bottom:6px;">🔒 Validare AI</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:18px;
+                    letter-spacing:0.3px;">Introdu parola pentru a activa validarea AI</div>
+        <input id="_ai-pass-input" type="password" placeholder="Parolă"
+          style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(79,195,247,0.3);
+                 border-radius:8px;padding:10px 14px;color:#e0e0e0;font-size:13px;
+                 font-family:'Space Mono',monospace;outline:none;letter-spacing:2px;
+                 margin-bottom:10px;" />
+        <div id="_ai-pass-err" style="font-size:10.5px;color:#ef5350;min-height:16px;
+                                       margin-bottom:10px;display:none;">
+          ✘ Parolă incorectă
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button id="_ai-pass-cancel"
+            style="padding:7px 16px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);
+                   background:transparent;color:rgba(255,255,255,0.4);font-size:11px;cursor:pointer;">
+            Anulează
+          </button>
+          <button id="_ai-pass-ok"
+            style="padding:7px 18px;border-radius:8px;border:none;
+                   background:linear-gradient(135deg,#4fc3f7,#7c6af7);
+                   color:#fff;font-size:11px;font-weight:700;cursor:pointer;">
+            Confirmă
+          </button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    const input  = overlay.querySelector('#_ai-pass-input');
+    const errEl  = overlay.querySelector('#_ai-pass-err');
+    const btnOk  = overlay.querySelector('#_ai-pass-ok');
+    const btnCan = overlay.querySelector('#_ai-pass-cancel');
+
+    input.focus();
+
+    async function trySubmit() {
+      const hash = await _sha256(input.value);
+      if (hash === _AI_PASS_HASH) {
+        overlay.remove();
+        resolve(true);
+      } else {
+        errEl.style.display = 'block';
+        input.value = '';
+        input.style.borderColor = 'rgba(239,83,80,0.6)';
+        input.focus();
+        setTimeout(() => { input.style.borderColor = 'rgba(79,195,247,0.3)'; }, 1200);
+      }
+    }
+
+    btnOk.addEventListener('click', trySubmit);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') trySubmit(); });
+    btnCan.addEventListener('click', () => { overlay.remove(); resolve(false); });
+    overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); resolve(false); } });
+  });
+}
+
 // ── Handler buton Validare AI (apelat din HTML onclick) ──
 window._runAIValidation = async function () {
+  const ok = await _showPasswordModal();
+  if (!ok) return;
+
   const btn = document.getElementById('val-ai-validate-btn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Validare AI...'; }
 
