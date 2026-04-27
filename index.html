@@ -442,9 +442,13 @@
 
       <div class="stock-bar">
         <div>
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
-            <div id="stock-name" class="stock-name">—</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:baseline; gap:16px; flex-wrap:wrap;">
+              <div id="stock-name" class="stock-name">—</div>
+              <div id="stock-price" class="stock-price" style="margin-left:0; font-size:22px;">—</div>
+            </div>
             <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+              <span style="color:rgba(255,255,255,0.18); font-size:22px; font-weight:300; line-height:1;">·</span>
               <div id="val-score-inline" style="display:none;"></div>
             </div>
             <button id="save-watchlist-btn" style="display:none; flex-shrink:0; padding:6px 14px;
@@ -717,7 +721,6 @@
           <div id="val-fundamental-comment" style="display:none; margin-top:12px;"></div>
           <div id="ou-results-section"></div>
         </div>
-        <div id="stock-price" class="stock-price">—</div>
       </div>
 
       <div class="price-chart-box">
