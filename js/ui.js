@@ -57,32 +57,7 @@ export function setPillColor(pillId, color) {
 export function renderSectorBadge(sector, industry, vixData, weights) {
   const el = $('sector-badge');
   if (!el) return;
-  const emoji = weights?.emoji || '📊';
-
-  // ── Sector chip (only sector in #sector-badge) ───────
-  el.innerHTML = sector ? `
-    <span class="tip-wrap">
-      <span class="sector-chip">${emoji} ${sector}</span>
-      <i class="tip-icon" style="border-color:rgba(79,195,247,0.4)">i</i>
-      <div class="tip-bubble">
-        <strong>🏭 Sector — ${sector}</strong>
-        ${industry ? `<em style="color:#aaa;font-size:10px">${industry}</em><br><br>` : ''}
-        Sectorul determina <b>ponderile</b> celor 7 factori de sentiment. Fiecare sector amplifica factorii cei mai relevanti:
-        <div class="tip-scale" style="margin-top:6px">
-          <div class="tip-scale-row"><span class="tip-dot" style="background:#4fc3f7"></span> Energy → geopolitica + tarife</div>
-          <div class="tip-scale-row"><span class="tip-dot" style="background:#ce93d8"></span> Technology → reglementari + inovatie</div>
-          <div class="tip-scale-row"><span class="tip-dot" style="background:#ffcc02"></span> Financial → macro + dobânzi</div>
-        </div>
-        <span class="tip-impact">Influenteaza: ponderile sentimentului AI</span>
-      </div>
-    </span>` : '';
-  if (sector) el.style.display = 'flex';
-
-  // ── VIX pill (in pills section #pill-vix) ────────────
-  const pillVix  = $('pill-vix');
-  const infoVix  = $('info-vix');
-  if (!pillVix || !infoVix) return;
-
+  const emoji    = weights?.emoji || '📊';
   const vixColor = !vixData?.vix    ? '#888'
                  : vixData.vix < 15 ? '#66bb6a'
                  : vixData.vix < 25 ? '#ffee58'
@@ -99,22 +74,42 @@ export function renderSectorBadge(sector, industry, vixData, weights) {
           ? 'Volatilitate <strong style="color:#ffa726">ridicata</strong> — sigma creste +20% in simulare.'
           : 'Piata in <strong style="color:#ef5350">panica</strong> — sigma creste +40% in simulare.';
 
-  infoVix.textContent = `${vixData?.vix ?? 'N/A'} ${vixData?.vixLabel ?? ''}`;
-  infoVix.style.color = vixColor;
-
-  // update tip icon colour
-  const tipIcon = $('pill-vix-tip-icon');
-  if (tipIcon) {
-    tipIcon.style.borderColor  = vixColor;
-    tipIcon.style.color        = vixColor;
-    tipIcon.style.background   = 'transparent';
-  }
-
-  // inject current impact text into the bubble
-  const tipImpact = $('pill-vix-tip-impact');
-  if (tipImpact) tipImpact.innerHTML = vixImpactDesc;
-
-  pillVix.style.display = 'inline-flex';
+  el.innerHTML = `
+    ${sector ? `<span class="tip-wrap">
+      <span class="sector-chip">${emoji} ${sector}</span>
+      <i class="tip-icon" style="border-color:rgba(79,195,247,0.4)">i</i>
+      <div class="tip-bubble">
+        <strong>🏭 Sector — ${sector}</strong>
+        ${industry ? `<em style="color:#aaa;font-size:10px">${industry}</em><br><br>` : ''}
+        Sectorul determina <b>ponderile</b> celor 7 factori de sentiment. Fiecare sector amplifica factorii cei mai relevanti:
+        <div class="tip-scale" style="margin-top:6px">
+          <div class="tip-scale-row"><span class="tip-dot" style="background:#4fc3f7"></span> Energy → geopolitica + tarife</div>
+          <div class="tip-scale-row"><span class="tip-dot" style="background:#ce93d8"></span> Technology → reglementari + inovatie</div>
+          <div class="tip-scale-row"><span class="tip-dot" style="background:#ffcc02"></span> Financial → macro + dobânzi</div>
+        </div>
+        <span class="tip-impact">Influenteaza: ponderile sentimentului AI</span>
+      </div>
+    </span>` : ''}
+    <span class="tip-wrap">
+      <span class="vix-chip" style="color:${vixColor}">
+        VIX: ${vixData?.vix ?? 'N/A'} ${vixData?.vixLabel ?? ''}
+      </span>
+      <i class="tip-icon" style="border-color:${vixColor};color:${vixColor};background:transparent">i</i>
+      <div class="tip-bubble">
+        <strong>😱 VIX — Indicele fricii pietei</strong>
+        Masoara volatilitatea <em>implicita</em> asteptata de piata pe urmatoarele 30 de zile. Cu cat e mai mare, cu atat piata anticipeaza miscari bruste.
+        <div class="tip-scale" style="margin-top:6px">
+          <div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> &lt; 15 — piata calma, sigma normala</div>
+          <div class="tip-scale-row"><span class="tip-dot" style="background:#ffee58"></span> 15–25 — normal, impact minor</div>
+          <div class="tip-scale-row"><span class="tip-dot" style="background:#ffa726"></span> 25–35 — ingrijorare, sigma +20%</div>
+          <div class="tip-scale-row"><span class="tip-dot" style="background:#ef5350"></span> &gt; 35 — panica, sigma +40%</div>
+        </div>
+        <div style="margin-top:6px;font-size:10.5px">${vixImpactDesc}</div>
+        <span class="tip-impact">Influenteaza: sigma in simulare</span>
+      </div>
+    </span>
+  `;
+  el.style.display = 'flex';
 }
 
 // ── Tabel statistici ─────────────────────────────────
@@ -162,7 +157,9 @@ export function renderStatsCard(stats, statsAdj, currentPrice, days, currency) {
 // ── Randeaza rezultatele pentru o perioada ────────────
 
 export function renderPeriod(periodData) {
-  const { stats, statsAdj, percs, percsAdj, days, currentPrice, currency, ticker } = periodData;
+  const { stats, statsAdj, percs, percsAdj,
+          ouStats, ouPercs,
+          days, currentPrice, currency, ticker } = periodData;
   const canvasTraj = `traj-${days}`;
   const canvasHist = `hist-${days}`;
   $('chart-area').innerHTML = `
@@ -179,7 +176,7 @@ export function renderPeriod(periodData) {
     ${renderStatsCard(stats, statsAdj, currentPrice, days, currency)}
   `;
   requestAnimationFrame(() => {
-    drawTrajectories(canvasTraj, percs, percsAdj, days, currentPrice, ticker);
-    drawHistogram(canvasHist, stats, statsAdj, currentPrice, days);
+    drawTrajectories(canvasTraj, percs, percsAdj, days, currentPrice, ticker, ouPercs);
+    drawHistogram(canvasHist, stats, statsAdj, currentPrice, days, ouStats);
   });
 }
