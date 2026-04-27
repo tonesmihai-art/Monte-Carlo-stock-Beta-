@@ -187,11 +187,11 @@ input[type=text]:focus { border-color: var(--blue); }
   display: flex;
   flex-direction: column;
 }
-.stock-bar        { order: 1; }
-.price-chart-box  { order: 2; }
-#valuation-panel  { order: 3; }
-.period-tabs      { order: 4; }
-#chart-area       { order: 5; }
+.stock-bar         { order: 1; }
+#valuation-panel   { order: 2; }
+.price-chart-box   { order: 3; }
+.period-tabs       { order: 4; }
+#chart-area        { order: 5; }
 #sentiment-section { order: 6; }
 /* comentariu fundamental — sub panelul de valuare */
 #val-fundamental-comment {
