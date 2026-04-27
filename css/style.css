@@ -187,11 +187,12 @@ input[type=text]:focus { border-color: var(--blue); }
   display: flex;
   flex-direction: column;
 }
-.stock-bar      { order: 1; }
-.price-chart-box { order: 2; }
-#valuation-panel { order: 3; }
-.period-tabs    { order: 4; }
-#chart-area     { order: 5; }
+.stock-bar        { order: 1; }
+.price-chart-box  { order: 2; }
+#valuation-panel  { order: 3; }
+.period-tabs      { order: 4; }
+#chart-area       { order: 5; }
+#sentiment-section { order: 6; }
 /* comentariu fundamental — sub panelul de valuare */
 #val-fundamental-comment {
   background: linear-gradient(135deg, rgba(18,18,31,0.95) 0%, rgba(26,26,46,0.95) 100%);
@@ -256,6 +257,7 @@ input[type=text]:focus { border-color: var(--blue); }
 .price-chart-box {
   background: var(--panel); border: 1px solid var(--border);
   border-radius: 8px; padding: 16px; margin-bottom: 20px;
+  width: 100%;
 }
 .chart-label { font-size: 10px; color: var(--gray); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 12px; }
 .canvas-wrap { position: relative; height: 220px; }
@@ -263,7 +265,7 @@ input[type=text]:focus { border-color: var(--blue); }
 
 /* ── Period tabs ────────────────────────────────── */
 .period-tabs {
-  display: flex; gap: 4px; margin-bottom: 16px;
+  display: flex; gap: 4px; margin-bottom: 16px; width: 100%;
 }
 .tab-btn {
   background: var(--panel2); border: 1px solid var(--border);
@@ -275,9 +277,10 @@ input[type=text]:focus { border-color: var(--blue); }
 .tab-btn.active { background: var(--accent); border-color: var(--accent); color: var(--white); }
 
 /* ── Chart grid ─────────────────────────────────── */
+#chart-area { width: 100%; }
 .chart-grid {
   display: grid; grid-template-columns: 1fr 1fr;
-  gap: 16px; margin-bottom: 16px;
+  gap: 16px; margin-bottom: 16px; width: 100%;
 }
 @media (max-width: 720px) { .chart-grid { grid-template-columns: 1fr; } }
 
