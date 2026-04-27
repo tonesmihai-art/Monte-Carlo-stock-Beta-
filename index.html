@@ -242,6 +242,7 @@
   <nav class="nav">
     <button class="nav-btn active" data-section="sim-section">Simulare</button>
     <button class="nav-btn" data-section="watchlist-section">📌 Urmărit <span id="watchlist-count" style="display:none;background:rgba(79,195,247,0.25);border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;">0</span></button>
+    <button class="nav-btn" data-section="compare-section">📊 Comparații</button>
     <button class="nav-btn" data-section="about-section">Despre</button>
   </nav>
 
@@ -786,6 +787,81 @@
       <span style="font-size:11px;">Rulează o simulare și apasă 📌 Adaugă la urmărit.</span>
     </div>
     <div id="watchlist-cards" style="display:flex; flex-direction:column; gap:12px;"></div>
+  </section>
+
+  <!-- ══ SECTIUNE COMPARATII ══════════════════════════ -->
+  <section id="compare-section" class="section">
+    <div style="padding:0 4px">
+
+      <!-- Header + butoane DB -->
+      <div style="display:flex;align-items:center;justify-content:space-between;
+                  flex-wrap:wrap;gap:8px;margin-bottom:16px">
+        <div style="color:#e0e0ff;font-size:15px;font-weight:600">
+          📊 Comparații simulări
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button id="compare-export-btn"
+                  style="padding:6px 14px;border-radius:20px;border:1px solid rgba(79,195,247,0.3);
+                         background:rgba(79,195,247,0.08);color:#4fc3f7;
+                         cursor:pointer;font-size:12px">
+            ⬇ Export .sqlite
+          </button>
+          <button id="compare-import-btn"
+                  style="padding:6px 14px;border-radius:20px;border:1px solid rgba(255,255,255,0.15);
+                         background:rgba(255,255,255,0.05);color:#aaa;
+                         cursor:pointer;font-size:12px">
+            ⬆ Import .sqlite
+          </button>
+          <input type="file" id="compare-import-input" accept=".sqlite,.db" style="display:none">
+        </div>
+      </div>
+
+      <!-- Cautare ticker -->
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <input type="text" id="compare-search"
+               placeholder="Filtrează după ticker (ex: AAPL)"
+               maxlength="12"
+               style="flex:1;padding:8px 14px;border-radius:20px;
+                      border:1px solid rgba(255,255,255,0.12);
+                      background:rgba(255,255,255,0.05);
+                      color:#e0e0ff;font-size:13px;outline:none">
+        <button id="compare-search-btn"
+                style="padding:8px 18px;border-radius:20px;
+                       background:rgba(79,195,247,0.15);
+                       border:1px solid rgba(79,195,247,0.3);
+                       color:#4fc3f7;cursor:pointer;font-size:13px">
+          Caută
+        </button>
+      </div>
+
+      <!-- Lista simulari salvate -->
+      <div id="compare-list"
+           style="max-height:340px;overflow-y:auto;margin-bottom:14px;
+                  border:1px solid rgba(255,255,255,0.06);border-radius:8px;
+                  padding:8px">
+        <div style="color:rgba(255,255,255,0.25);text-align:center;padding:30px;font-size:13px">
+          Se încarcă baza de date...
+        </div>
+      </div>
+
+      <!-- Buton Compara -->
+      <div style="display:flex;justify-content:center;margin-bottom:20px">
+        <button id="compare-run-btn"
+                style="padding:10px 32px;border-radius:24px;font-size:14px;
+                       font-weight:600;cursor:pointer;
+                       background:linear-gradient(135deg,rgba(79,195,247,0.2),rgba(102,187,106,0.15));
+                       border:1px solid rgba(79,195,247,0.4);color:#4fc3f7;
+                       transition:all .2s"
+                onmouseover="this.style.background='rgba(79,195,247,0.25)'"
+                onmouseout="this.style.background='linear-gradient(135deg,rgba(79,195,247,0.2),rgba(102,187,106,0.15))'">
+          Compară simulările selectate
+        </button>
+      </div>
+
+      <!-- Rezultat comparatie -->
+      <div id="compare-result"></div>
+
+    </div>
   </section>
 
   <section id="about-section" class="section">
