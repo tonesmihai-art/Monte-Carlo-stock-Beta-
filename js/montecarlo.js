@@ -452,3 +452,206 @@ function calcMeanRevStrength(deviationPct) {
 }
 
 export { NUM_SIMS };
+
+// ═══════════════════════════════════════════════════════
+//  OU + HESTON — Simulare 2 (Mean Reversion + Vol. Stoch.)
+// ═══════════════════════════════════════════════════════
+
+export const NUM_SIMS_OU = 15_000;
+
+// ── Estimare parametri OU + Heston din date istorice ──
+//
+//  κ_S  — viteza de revenire a log-pretului spre μ
+//  μ    — nivelul de echilibru (pret, nu log)
+//  κ_v  — viteza de revenire a variantei spre θ (din GARCH)
+//  θ    — varianta pe termen lung (σ_LR²)
+//  ξ    — volatilitatea volatilitatii (vol-of-vol)
+//  ρ    — corelatie randamente <-> schimbari de volatilitate
+//         (efectul lever: pret jos => vol sus, tipic -0.4…-0.7)
+//
+export function estimateOUHeston(closes, garch) {
+  const n = closes.length;
+  if (n < 60) return null;
+
+  const logP = closes.map(p => Math.log(p));
+  const dt   = 1 / 252;
+
+  // ── OLS exact pt OU: logP_t = a*logP_{t-1} + b + eps ─
+  let Sx = 0, Sy = 0, Sxy = 0, Sx2 = 0;
+  const m = logP.length - 1;
+  for (let i = 0; i < m; i++) {
+    Sx  += logP[i];
+    Sy  += logP[i + 1];
+    Sxy += logP[i] * logP[i + 1];
+    Sx2 += logP[i] * logP[i];
+  }
+  const denom = m * Sx2 - Sx * Sx;
+  const aOU   = denom > 1e-20 ? (m * Sxy - Sx * Sy) / denom : 1;
+  const bOU   = (Sy - aOU * Sx) / m;
+
+  // kappa: -ln(a)/dt; clampat la [0.01, 15] anual
+  const kappaS = Math.max(0.01, Math.min(15, -Math.log(Math.max(1e-9, Math.abs(aOU))) / dt));
+  // μ: nivel de echilibru
+  const muLog  = Math.abs(1 - aOU) > 1e-9 ? bOU / (1 - aOU) : logP.reduce((s,v) => s+v,0)/n;
+  const mu     = Math.exp(muLog);
+  // half-life in zile lucratoare
+  const halfLifeDays = Math.round(Math.log(2) / kappaS / dt);
+
+  // ── Sigma OU din reziduuri ────────────────────────────
+  let ssRes = 0;
+  for (let i = 0; i < m; i++) ssRes += (logP[i+1] - aOU*logP[i] - bOU) ** 2;
+  const sigmaOU = Math.sqrt(ssRes / (m - 2) / dt);
+
+  // ── Heston — din GARCH ────────────────────────────────
+  const kappav = garch ? Math.max(0.5, (1 - garch.persistence) * 252) : 5;
+  const theta  = garch ? garch.sigmaLR ** 2 : (sigmaOU ** 2 / 252);
+  const v0     = garch ? garch.sigma0  ** 2 : theta;
+
+  // ── ξ (vol-of-vol) din dispersia variantei pe ferestre ─
+  let xi = 0.35;
+  if (n >= 30) {
+    const winVars = [];
+    const returns = [];
+    for (let i = 1; i < n; i++) returns.push(logP[i] - logP[i-1]);
+    for (let i = 5; i < returns.length; i += 5) {
+      const w = returns.slice(i-5, i);
+      const wm = w.reduce((s,v) => s+v,0)/5;
+      winVars.push(w.reduce((s,v) => s+(v-wm)**2,0)/4/dt);
+    }
+    if (winVars.length > 3) {
+      const mwv = winVars.reduce((s,v) => s+v,0)/winVars.length;
+      const swv = Math.sqrt(winVars.reduce((s,v) => s+(v-mwv)**2,0)/(winVars.length-1));
+      xi = Math.max(0.1, Math.min(2.0, swv / Math.sqrt(mwv || 1)));
+    }
+  }
+
+  // ── ρ (leverage effect) din corr(ret_t, Δ|ret_{t-1}|) ─
+  let rho = -0.5;
+  if (n >= 30) {
+    const ret = [];
+    for (let i = 1; i < n; i++) ret.push(logP[i] - logP[i-1]);
+    const absRet = ret.map(r => Math.abs(r));
+    const m2 = ret.length - 1;
+    const mR  = ret.slice(1).reduce((s,v) => s+v,0)/m2;
+    const mA  = absRet.slice(0,m2).reduce((s,v) => s+v,0)/m2;
+    let cov = 0, da = 0, db = 0;
+    for (let i = 0; i < m2; i++) {
+      cov += (ret[i+1]-mR)*(absRet[i]-mA);
+      da  += (ret[i+1]-mR)**2;
+      db  += (absRet[i]-mA)**2;
+    }
+    const den2 = Math.sqrt(da*db);
+    if (den2 > 1e-20) rho = Math.max(-0.95, Math.min(0, cov/den2));
+  }
+
+  return { kappaS, mu, muLog, sigmaOU, halfLifeDays, kappav, theta, xi, rho, v0 };
+}
+
+// ── Simulare OU + Heston (Euler-Maruyama, Full Truncation) ─
+//
+//  d(logP) = κ_S·(μ_log − logP)·dt  +  √v·dW₁
+//  dv      = κ_v·(θ − v)·dt  +  ξ·√v·dW₂
+//  corr(dW₁, dW₂) = ρ  →  dW₂ = ρ·dW₁ + √(1−ρ²)·dZ
+//
+export function simulateOUHeston(ouParams, currentPrice, days) {
+  const { kappaS, muLog, kappav, theta, xi, rho, v0 } = ouParams;
+  const n      = NUM_SIMS_OU;
+  const dt     = 1 / 252;
+  const sqrtDt = Math.sqrt(dt);
+  const rho2   = Math.sqrt(Math.max(0, 1 - rho * rho));
+  const logP0  = Math.log(currentPrice);
+
+  const matrix    = new Float64Array((days + 1) * n);
+  const logPrices = new Float64Array(n).fill(logP0);
+  const variances = new Float64Array(n).fill(v0);
+
+  // Ziua 0
+  for (let s = 0; s < n; s++) matrix[s] = currentPrice;
+
+  for (let day = 1; day <= days; day++) {
+    const offset = day * n;
+    for (let s = 0; s < n; s++) {
+      // Doua normale independente (Box-Muller)
+      let u1, u2, u3, u4;
+      do { u1 = Math.random(); } while (u1 === 0);
+      do { u2 = Math.random(); } while (u2 === 0);
+      do { u3 = Math.random(); } while (u3 === 0);
+      do { u4 = Math.random(); } while (u4 === 0);
+      const z1  = Math.sqrt(-2*Math.log(u1)) * Math.cos(2*Math.PI*u2);
+      const z2  = Math.sqrt(-2*Math.log(u3)) * Math.cos(2*Math.PI*u4);
+      const dW1 = z1;
+      const dW2 = rho * z1 + rho2 * z2;       // corelat cu dW1
+
+      // Heston — Full Truncation (evita variante negative)
+      const v    = variances[s];
+      const sqV  = Math.sqrt(Math.max(0, v));
+      variances[s] = Math.max(0, v + kappav*(theta-v)*dt + xi*sqV*sqrtDt*dW2);
+
+      // OU log-pret
+      const sqV2 = Math.sqrt(Math.max(0, variances[s]));
+      logPrices[s] += kappaS*(muLog - logPrices[s])*dt + sqV2*sqrtDt*dW1;
+      matrix[offset + s] = Math.exp(logPrices[s]);
+    }
+  }
+  return matrix;
+}
+
+// ── Statistici din matricea OU (NUM_SIMS_OU) ──────────
+export function calcStatsOU(matrix, days, currentPrice) {
+  const n      = NUM_SIMS_OU;
+  const offset = days * n;
+  const finals = Float64Array.from(matrix.subarray(offset, offset + n));
+  const sorted = Float64Array.from(finals).sort();
+  const mean   = finals.reduce((a,b) => a+b, 0) / n;
+  let probProfit = 0, probGain10 = 0, probLoss10 = 0;
+  for (let i = 0; i < n; i++) {
+    if (sorted[i] > currentPrice)         probProfit++;
+    if (sorted[i] > currentPrice * 1.10)  probGain10++;
+    if (sorted[i] < currentPrice * 0.90)  probLoss10++;
+  }
+  return {
+    mean,
+    median:     sorted[Math.floor(n * 0.50)],
+    p10:        sorted[Math.floor(n * 0.10)],
+    p25:        sorted[Math.floor(n * 0.25)],
+    p75:        sorted[Math.floor(n * 0.75)],
+    p90:        sorted[Math.floor(n * 0.90)],
+    min: sorted[0], max: sorted[n-1],
+    probProfit: probProfit/n*100,
+    probGain10: probGain10/n*100,
+    probLoss10: probLoss10/n*100,
+    finals, sorted,
+  };
+}
+
+// ── Percentile per zi din matricea OU ────────────────
+export function percentilesPerDayOU(matrix, days, pcts = [10,50,90], step = 1) {
+  const n      = NUM_SIMS_OU;
+  const result = {};
+  pcts.forEach(p => { result[p] = new Float64Array(days + 1); });
+  const buf = new Float64Array(n);
+
+  const checkpoints = new Set([0, days]);
+  for (let d = step; d < days; d += step) checkpoints.add(d);
+  const checkSorted = Array.from(checkpoints).sort((a,b) => a-b);
+
+  for (const day of checkSorted) {
+    const offset = day * n;
+    buf.set(matrix.subarray(offset, offset + n));
+    buf.sort();
+    pcts.forEach(p => { result[p][day] = buf[Math.floor((p/100)*(n-1))]; });
+  }
+
+  if (step > 1) {
+    for (let i = 0; i < checkSorted.length - 1; i++) {
+      const a = checkSorted[i], b = checkSorted[i+1];
+      if (b-a <= 1) continue;
+      pcts.forEach(p => {
+        const va = result[p][a], vb = result[p][b];
+        for (let d = a+1; d < b; d++)
+          result[p][d] = va + (vb-va)*(d-a)/(b-a);
+      });
+    }
+  }
+  return result;
+}
