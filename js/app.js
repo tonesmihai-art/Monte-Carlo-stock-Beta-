@@ -540,11 +540,4 @@ document.addEventListener('DOMContentLoaded', () => {
       $('ticker-input').value = chip.dataset.ticker;
     });
   });
-
-  // ── Sync badge la schimbarea manuala a sectorului ────
-  $('val-sector')?.addEventListener('change', () => {
-    const valKey = $('val-sector').value;
-    renderSectorBadge(VAL_SECTOR_DISPLAY[valKey] || valKey,
-                      null, _lastVixData, _lastSectorWeights);
-  });
 });
