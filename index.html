@@ -470,6 +470,7 @@
                background:rgba(255,255,255,0.03); font-size:11.5px; line-height:1.65;
                color:rgba(255,255,255,0.60); max-width:560px;"></div>
           <div id="val-fundamental-comment" style="display:none; margin-top:12px;"></div>
+          <div id="ou-results-section"></div>
         </div>
 
         <div class="info-pills">
@@ -677,6 +678,25 @@
               </div>
             </span>
             <span id="info-ma50">—</span>
+          </div>
+
+          <!-- KAPPA OU — VITEZA MEAN REVERSION -->
+          <div class="pill" id="pill-kappa" style="display:none;">
+            <span class="tip-wrap">
+              κ<sub>S</sub>:
+              <i class="tip-icon">i</i>
+              <div class="tip-bubble tip-left">
+                <strong>🔄 κ<sub>S</sub> — Viteza Mean Reversion (OU)</strong>
+                Parametrul de revenire al procesului Ornstein-Uhlenbeck. Cat de repede pretul revine spre media de echilibru μ. Estimat prin OLS pe log-preturi.
+                <div class="tip-scale">
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> &gt; 0.05 — revenire rapida (&lt; 14 zile T½)</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ffee58"></span> 0.01–0.05 — revenire moderata</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ef5350"></span> &lt; 0.01 — aproape random walk</div>
+                </div>
+                <span class="tip-impact">Influenteaza: viteza cu care P50 OU+Heston converge spre μ</span>
+              </div>
+            </span>
+            <span id="info-kappa">—</span>
           </div>
 
           <!-- VOL TREND -->
