@@ -408,5 +408,4 @@ input[type=text]:focus { border-color: var(--blue); }
 
 /* ── Scrollbar ──────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-track { background
