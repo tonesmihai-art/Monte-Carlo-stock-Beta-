@@ -1056,3 +1056,187 @@ export function generateQualityComment({ sigma, volAnualPct, nu, garch, drift, d
 
   return parts.join('<br>');
 }
+
+// ── OU+Heston results section ─────────────────────────
+
+export function updateOUHestonDisplay(ouParams, periodResults, currentPrice, currency) {
+  if (!ouParams) return;
+
+  // ── Gaseste sau creeaza sectiunea ────────────────────
+  let section = document.getElementById('ou-results-section');
+  if (!section) {
+    section = document.createElement('div');
+    section.id = 'ou-results-section';
+    // Insereaza dupa val-fundamental-comment
+    const fundComment = document.getElementById('val-fundamental-comment');
+    if (fundComment?.parentNode) {
+      fundComment.parentNode.insertBefore(section, fundComment.nextSibling);
+    } else {
+      // Fallback: inainte de pills
+      const pills = document.querySelector('.info-pills');
+      if (pills?.parentNode) pills.parentNode.insertBefore(section, pills);
+    }
+  }
+
+  const sym = (currency === 'GBp') ? 'GBP ' : (currency === 'USD' ? '$' : currency + ' ');
+  const { kappaS, mu, halfLifeDays, kappav, theta, xi, rho, v0 } = ouParams;
+
+  // ── Directia de revenire ─────────────────────────────
+  const direction  = currentPrice < mu ? 'sub' : 'peste';
+  const dirColor   = currentPrice < mu ? '#66bb6a' : '#ef5350';
+  const dirArrow   = currentPrice < mu ? '↑' : '↓';
+  const distPct    = Math.abs((mu - currentPrice) / currentPrice * 100).toFixed(1);
+
+  // ── Colecteaza P50 OU+H si GBM pe perioade disponibile ─
+  const periods = [30, 90, 180].filter(d => periodResults[d]);
+  const tableRows = periods.map(d => {
+    const pr   = periodResults[d];
+    const ouP50 = pr.ouStats?.median ?? null;
+    const gbmP50 = pr.stats?.median  ?? null;
+    const ouPct  = ouP50  != null ? ((ouP50  - currentPrice) / currentPrice * 100) : null;
+    const gbmPct = gbmP50 != null ? ((gbmP50 - currentPrice) / currentPrice * 100) : null;
+    function colPct(v) {
+      if (v == null) return '<td style="color:#888">—</td>';
+      const c = v > 0 ? '#66bb6a' : '#ef5350';
+      return `<td style="color:${c};font-weight:600">${v >= 0 ? '+' : ''}${v.toFixed(1)}%</td>`;
+    }
+    function colVal(v) {
+      if (v == null) return '<td style="color:#888">—</td>';
+      return `<td style="color:rgba(255,255,255,0.75)">${sym}${v.toFixed(2)}</td>`;
+    }
+    return `<tr>
+      <td style="color:rgba(255,255,255,0.45);font-size:10.5px">${d} zile</td>
+      ${colVal(ouP50)}${colPct(ouPct)}
+      ${colVal(gbmP50)}${colPct(gbmPct)}
+    </tr>`;
+  }).join('');
+
+  // ── Scor convergenta ─────────────────────────────────
+  // Folosim half-life si kappav ca proxy de convergenta
+  const hlScore = halfLifeDays < 30  ? 90 : halfLifeDays < 90 ? 70
+                : halfLifeDays < 180 ? 50 : halfLifeDays < 365 ? 30 : 15;
+  const rvScore = (rho < -0.3 && rho > -0.8) ? 80 : (rho >= -0.3) ? 55 : 35;
+  const convScore = Math.round(hlScore * 0.65 + rvScore * 0.35);
+  const convColor = convScore >= 70 ? '#66bb6a' : convScore >= 45 ? '#ffee58' : '#ef5350';
+  const convLabel = convScore >= 70 ? 'Mean reversion puternic'
+                  : convScore >= 45 ? 'Mean reversion moderat'
+                  : 'Revenire lenta — proces aproape de random walk';
+
+  // ── Parametru κ_S in pill ────────────────────────────
+  const pillKappa = document.getElementById('pill-kappa');
+  if (pillKappa) {
+    const kEl = document.getElementById('info-kappa');
+    if (kEl) kEl.textContent = kappaS.toFixed(3);
+    const kappaPctColor = halfLifeDays < 60 ? 'pill--green'
+                        : halfLifeDays < 180 ? 'pill--yellow' : 'pill--orange';
+    ['pill--green','pill--yellow','pill--orange','pill--red'].forEach(c => pillKappa.classList.remove(c));
+    pillKappa.classList.add(kappaPctColor);
+    pillKappa.style.display = '';
+  }
+
+  // ── Tooltip helper ───────────────────────────────────
+  function tip(label, value, desc, scale) {
+    return `<span class="tip-wrap">
+      <span class="pill" style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;
+            border-radius:10px;font-size:10.5px;background:rgba(206,147,216,0.10);
+            border:1px solid rgba(206,147,216,0.28);cursor:default;white-space:nowrap">
+        <span style="color:rgba(255,255,255,0.45)">${label}</span>
+        <span style="color:#ce93d8;font-weight:700">${value}</span>
+      </span>
+      <i class="tip-icon" style="border-color:rgba(206,147,216,0.5);color:rgba(206,147,216,0.7)">i</i>
+      <div class="tip-bubble" style="width:240px">
+        ${desc}
+        ${scale ? `<div class="tip-scale" style="margin-top:6px">${scale}</div>` : ''}
+      </div>
+    </span>`;
+  }
+
+  const hlStr  = halfLifeDays < 999 ? `${halfLifeDays.toFixed(0)} zile` : 'lungă';
+  const thetaAnn = (Math.sqrt(theta) * Math.sqrt(252) * 100).toFixed(1);
+  const v0Ann    = (Math.sqrt(v0)    * Math.sqrt(252) * 100).toFixed(1);
+
+  section.innerHTML = `
+    <div style="margin-top:14px;padding:12px 14px;border-radius:10px;
+                background:rgba(206,147,216,0.05);border:1px solid rgba(206,147,216,0.20);">
+
+      <!-- Titlu -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+        <div style="font-size:11px;letter-spacing:1.2px;text-transform:uppercase;
+                    color:rgba(206,147,216,0.85);font-weight:700;">
+          🔄 Simulare OU + Heston &nbsp;·&nbsp; Mean Reversion + Volatilitate Stochastică
+        </div>
+        <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:10px;
+                     border:1px solid ${convColor}44;background:${convColor}10;font-size:10.5px;font-weight:700;">
+          <span style="color:${convColor}">${convScore}/100</span>
+          <span style="color:rgba(255,255,255,0.35);font-size:9px">·</span>
+          <span style="color:${convColor};font-size:9.5px">${convLabel}</span>
+        </span>
+      </div>
+
+      <!-- Concluzie directie -->
+      <div style="font-size:11.5px;color:rgba(255,255,255,0.75);margin-bottom:10px;line-height:1.6">
+        Prețul curent (<strong>${sym}${currentPrice.toFixed(2)}</strong>) se află
+        <strong style="color:${dirColor}">${direction} media de revenire μ = ${sym}${mu.toFixed(2)}</strong>
+        (deviere ${distPct}%).
+        Modelul OU anticipează o mișcare de <strong style="color:${dirColor}">${dirArrow} ${distPct}%</strong>
+        spre μ în ~<em>${hlStr}</em> (T½).
+      </div>
+
+      <!-- Parametri cu tooltipuri -->
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+        ${tip('κ<sub>S</sub>', kappaS.toFixed(3),
+          '<strong>κ<sub>S</sub> — Viteza de revenire OU</strong><br>Cat de repede prețul revine spre μ. Estimat prin OLS pe log-prețuri.',
+          `<div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> &gt; 0.05 — revenire rapidă</div>
+           <div class="tip-scale-row"><span class="tip-dot" style="background:#ffee58"></span> 0.01–0.05 — moderat</div>
+           <div class="tip-scale-row"><span class="tip-dot" style="background:#ef5350"></span> &lt; 0.01 — aproape random walk</div>
+           <span class="tip-impact">Influenteaza: cât de repede P50 convergheaza spre μ</span>`)}
+
+        ${tip('μ', `${sym}${mu.toFixed(2)}`,
+          '<strong>μ — Nivelul de echilibru OU</strong><br>Prețul spre care procesul gravitează pe termen lung. Estimat din OLS pe log-prețuri istorice.',
+          `<span class="tip-impact">Media spre care P50 converge în simulare</span>`)}
+
+        ${tip('T½', hlStr,
+          '<strong>T½ — Jumătatea vieții</strong><br>Timp în care jumătate din devierea față de μ se elimină. T½ = ln(2)/κ<sub>S</sub>.',
+          `<div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> &lt; 30 zile — revenire rapidă</div>
+           <div class="tip-scale-row"><span class="tip-dot" style="background:#ffee58"></span> 30–90 zile — moderat</div>
+           <div class="tip-scale-row"><span class="tip-dot" style="background:#ef5350"></span> &gt; 180 zile — lent</div>
+           <span class="tip-impact">Orizont estimat de normalizare a prețului</span>`)}
+
+        ${tip('ρ', rho.toFixed(2),
+          '<strong>ρ — Corelatie ret/volatilitate</strong><br>Corelația dintre mișcările de preț și volatilitate (leverage effect). Negativ = volatilitate crește când prețul scade.',
+          `<div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> ρ ≈ −0.3 ÷ −0.7 — normal (acțiuni)</div>
+           <div class="tip-scale-row"><span class="tip-dot" style="background:#ffa726"></span> ρ ≈ 0 — independent</div>
+           <span class="tip-impact">Influenteaza: asimetria distributiei simulate</span>`)}
+
+        ${tip('κ<sub>v</sub>', kappav.toFixed(3),
+          '<strong>κ<sub>v</sub> — Viteza revenire volatilitate</strong><br>Cât de repede volatilitatea revine la θ după un șoc. Estimat din persistența GARCH.',
+          `<span class="tip-impact">Influenteaza: cat de rapid dispare un spike de volatilitate</span>`)}
+
+        ${tip('θ', `${thetaAnn}%/an`,
+          '<strong>θ — Volatilitate de echilibru Heston</strong><br>Nivelul pe termen lung al volatilității (σ_LR din GARCH). Varianța revine spre θ.',
+          `<span class="tip-impact">Volatilitatea "normala" a activului pe termen lung</span>`)}
+
+        ${tip('ξ', xi.toFixed(4),
+          '<strong>ξ — Vol-of-vol (volatilitatea volatilitatii)</strong><br>Cât de mult fluctuează varianța în jurul lui θ. Val. mare → distribuție mai fat-tailed.',
+          `<div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> &lt; 0.3 — stabil</div>
+           <div class="tip-scale-row"><span class="tip-dot" style="background:#ef5350"></span> &gt; 0.6 — volatilitate impredictibilă</div>
+           <span class="tip-impact">Influenteaza: grosimea cozilor distributiei</span>`)}
+      </div>
+
+      <!-- Tabel comparativ P50 -->
+      ${tableRows ? `
+      <div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;
+                  letter-spacing:0.6px;margin-bottom:6px">Comparatie P50 median — OU+Heston vs GBM+GARCH</div>
+      <table style="width:100%;border-collapse:collapse;font-size:10.5px">
+        <thead><tr>
+          <th style="color:rgba(255,255,255,0.3);text-align:left;padding:3px 8px 5px 0;font-weight:600">Perioada</th>
+          <th style="color:rgba(206,147,216,0.8);padding:3px 8px 5px;font-weight:600">OU+H P50</th>
+          <th style="color:rgba(206,147,216,0.6);padding:3px 8px 5px;font-weight:600">Δ%</th>
+          <th style="color:rgba(79,195,247,0.8);padding:3px 8px 5px;font-weight:600">GBM P50</th>
+          <th style="color:rgba(79,195,247,0.6);padding:3px 0 5px;font-weight:600">Δ%</th>
+        </tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>` : ''}
+
+    </div>`;
+}
