@@ -1,409 +1,833 @@
-/* ── Fonts ─────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;800&display=swap');
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monte Carlo Stocks</title>
+  <meta name="description" content="Simulare Monte Carlo pentru actiuni cu analiza sentiment" />
+  <meta name="theme-color" content="#0a0a14" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="css/style.css" />
+  
+  <script>
+  fetch('https://monte-carlo-proxy.onrender.com/ping')
+    .then(r => r.json())
+    .then(data => {
+      const msg = data.yahoo_session === 'activa'
+        ? '✅ Proxy online · Yahoo activ'
+        : '⚠️ Proxy online · Yahoo esuat';
+      const div = document.createElement('div');
+      div.textContent = msg;
+      div.style.cssText = `
+        position:fixed; bottom:20px; right:20px; z-index:99999;
+        background:#1a1a2e; border:1px solid rgba(79,195,247,0.4);
+        color:#4fc3f7; padding:10px 18px; border-radius:20px;
+        font-size:12px; font-weight:600; box-shadow:0 4px 20px rgba(0,0,0,0.5);
+        transition: opacity 1s;
+      `;
+      document.body.appendChild(div);
+      setTimeout(() => { div.style.opacity = '0'; }, 4000);
+      setTimeout(() => { div.remove(); }, 5000);
+    })
+    .catch(() => {
+      // proxy inca porneste, ignoram
+    });
+</script>
 
-/* ── Variables ──────────────────────────────────── */
-:root {
-  --bg:       #0a0a14;
-  --panel:    #12121f;
-  --panel2:   #1a1a2e;
-  --border:   #2a2a44;
-  --green:    #66bb6a;
-  --red:      #ef5350;
-  --yellow:   #ffee58;
-  --blue:     #4fc3f7;
-  --orange:   #ffa726;
-  --white:    #e8e8f0;
-  --gray:     #555577;
-  --accent:   #7c6af7;
-  --font-mono: 'Space Mono', monospace;
-  --font-sans: 'Syne', sans-serif;
-}
+  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    /* ── Sector & VIX badges ─────────────────────────── */
+    #sector-badge { display:none; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap; }
+    .sector-chip {
+      background: rgba(79,195,247,0.12); color: #4fc3f7;
+      border: 1px solid rgba(79,195,247,0.3);
+      border-radius: 20px; padding: 3px 10px; font-size: 12px; font-weight: 600;
+    }
+    .vix-chip {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 20px; padding: 3px 10px; font-size: 12px; font-weight: 600;
+    }
 
-/* ── Reset ──────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
+    /* ── Tooltip system ──────────────────────────────── */
+    .tip-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .tip-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: rgba(79,195,247,0.18);
+      border: 1px solid rgba(79,195,247,0.4);
+      color: #4fc3f7;
+      font-size: 9px;
+      font-weight: 700;
+      cursor: help;
+      flex-shrink: 0;
+      line-height: 1;
+      transition: background 0.2s;
+      font-style: normal;
+    }
+    .tip-icon:hover {
+      background: rgba(79,195,247,0.35);
+    }
+    .tip-bubble {
+      visibility: hidden;
+      opacity: 0;
+      pointer-events: none;
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: 230px;
+      background: #1a1a2e;
+      border: 1px solid rgba(79,195,247,0.35);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 11px;
+      line-height: 1.55;
+      color: #cdd;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+      z-index: 9999;
+      transition: opacity 0.18s ease, visibility 0.18s ease;
+      text-align: left;
+      white-space: normal;
+    }
+    .tip-bubble::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: rgba(79,195,247,0.35);
+    }
+    .tip-wrap:hover .tip-bubble,
+    .tip-wrap:focus-within .tip-bubble {
+      visibility: visible;
+      opacity: 1;
+    }
+    .tip-bubble.tip-left {
+      left: auto;
+      right: 0;
+      transform: none;
+    }
+    .tip-bubble.tip-left::after {
+      left: auto;
+      right: 10px;
+      transform: none;
+    }
+    .tip-bubble strong {
+      color: #4fc3f7;
+      display: block;
+      margin-bottom: 4px;
+      font-size: 11.5px;
+    }
+    .tip-bubble .tip-impact {
+      display: inline-block;
+      margin-top: 5px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 600;
+      background: rgba(79,195,247,0.12);
+      color: #4fc3f7;
+    }
+    .tip-bubble .tip-scale {
+      margin-top: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .tip-scale-row {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+    }
+    .tip-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
 
-body {
-  background: var(--bg);
-  color: var(--white);
-  font-family: var(--font-mono);
-  font-size: 13px;
-  min-height: 100vh;
-  overflow-x: hidden;
-}
+    /* ── Individual pill color variants ─────────────── */
+    .info-pills {
+      flex-wrap: wrap;
+    }
+    .pill {
+      transition: border-color 0.3s ease, background 0.3s ease;
+    }
+    .pill--green  { border-color: rgba(102,187,106,0.55) !important; background: rgba(102,187,106,0.08) !important; }
+    .pill--yellow { border-color: rgba(255,238,88,0.5)  !important; background: rgba(255,238,88,0.07)  !important; }
+    .pill--orange { border-color: rgba(255,167,38,0.5)  !important; background: rgba(255,167,38,0.08)  !important; }
+    .pill--red    { border-color: rgba(239,83,80,0.55)  !important; background: rgba(239,83,80,0.08)   !important; }
+    .pill--gray   { border-color: rgba(136,136,136,0.35)!important; background: rgba(136,136,136,0.05) !important; }
+    .pill--purple { border-color: rgba(206,147,216,0.5) !important; background: rgba(206,147,216,0.08) !important; }
 
-/* ── Background grid ────────────────────────────── */
-body::before {
-  content: '';
-  position: fixed; inset: 0;
-  background-image:
-    linear-gradient(rgba(124,106,247,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(124,106,247,0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
-  pointer-events: none; z-index: 0;
-}
+    /* ── Valuation Panel ─────────────────────────────── */
+    #valuation-panel {
+      background: rgba(79,195,247,0.03);
+      border: 1px solid rgba(79,195,247,0.18);
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 16px;
+    }
+    .val-header {
+      display: flex; justify-content: space-between; align-items: center;
+      cursor: pointer; user-select: none;
+    }
+    .val-title {
+      font-size: 12.5px; font-weight: 700; color: #4fc3f7; letter-spacing: 0.5px;
+    }
+    .val-toggle-btn {
+      background: none; border: 1px solid rgba(79,195,247,0.22);
+      color: rgba(255,255,255,0.35); cursor: pointer; font-size: 10.5px;
+      padding: 2px 10px; border-radius: 20px; transition: all 0.2s; font-weight: 600;
+    }
+    .val-toggle-btn:hover { color: #4fc3f7; border-color: rgba(79,195,247,0.5); }
+    .val-content { margin-top: 14px; }
+    .val-inputs-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr));
+      gap: 9px; margin-bottom: 14px;
+    }
+    .val-input-group { display: flex; flex-direction: column; gap: 3px; }
+    .val-input-group label {
+      font-size: 9.5px; color: rgba(255,255,255,0.38);
+      letter-spacing: 0.5px; text-transform: uppercase;
+    }
+    .val-input-group input, .val-input-group select {
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 6px; padding: 5px 8px; color: #e0e0e0; font-size: 12px;
+      outline: none; transition: border-color 0.2s; width: 100%;
+    }
+    .val-input-group input:focus, .val-input-group select:focus {
+      border-color: rgba(79,195,247,0.5);
+    }
+    .val-input-group select option { background: #1a1a2e; }
+    .val-results-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(115px,1fr)); gap: 8px;
+    }
+    .val-method-card {
+      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px; padding: 9px 11px;
+    }
+    .vm-label { font-size: 9px; color: rgba(255,255,255,0.32); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 3px; }
+    .vm-val   { font-size: 15px; font-weight: 700; color: #e0e0e0; }
+    .vm-weight{ font-size: 9px; color: rgba(255,255,255,0.28); margin-top: 2px; }
+    .val-weighted-card {
+      background: rgba(79,195,247,0.07); border: 1px solid rgba(79,195,247,0.28);
+      border-radius: 8px; padding: 9px 11px;
+    }
+    .val-weighted-card .vm-label { color: rgba(79,195,247,0.65); }
+    .val-weighted-card .vm-val   { font-size: 17px; color: #4fc3f7; }
+    .val-margin-card { border-radius: 8px; padding: 9px 11px; }
+    .val-margin-card .vm-val { font-size: 17px; font-weight: 700; }
+  </style>
+</head>
+<body>
+<div id="app">
 
-/* ── Layout ─────────────────────────────────────── */
-#app { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 0 16px 60px; }
+  <header>
+    <div class="logo">MC<span>.</span>Stocks.</span> V31-beta</div>
+    <div class="tagline">Monte Carlo · 30k Simulari · Sentiment AI</div>
+  </header>
 
-/* ── Header ─────────────────────────────────────── */
-header {
-  padding: 28px 0 20px;
-  display: flex; align-items: center; gap: 16px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 24px;
-}
+  <nav class="nav">
+    <button class="nav-btn active" data-section="sim-section">Simulare</button>
+    <button class="nav-btn" data-section="watchlist-section">📌 Urmărit <span id="watchlist-count" style="display:none;background:rgba(79,195,247,0.25);border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;">0</span></button>
+    <button class="nav-btn" data-section="about-section">Despre</button>
+  </nav>
 
-.logo {
-  font-family: var(--font-sans);
-  font-size: 22px; font-weight: 800;
-  letter-spacing: -0.5px;
-  background: linear-gradient(135deg, var(--blue), var(--accent));
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-}
+  <section id="sim-section" class="section active">
 
-.logo span { color: var(--green); -webkit-text-fill-color: var(--green); }
+    <div class="input-panel">
+      <div class="input-row">
+        <div class="input-group">
+          <label for="ticker-input">Ticker actiune</label>
+          <input type="text" id="ticker-input" placeholder="ex: AAPL" maxlength="12" />
+        </div>
+        <button class="run-btn" id="run-btn">Ruleaza simularea</button>
+      </div>
 
-.tagline {
-  font-size: 10px; color: var(--gray);
-  letter-spacing: 2px; text-transform: uppercase;
-  margin-left: auto;
-}
+      <div class="toggle-row">
+        <label class="toggle">
+          <input type="checkbox" id="toggle-sentiment" checked />
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="toggle-label">Analiza sentiment (Yahoo Finance + Reuters + Google News)</span>
+      </div>
 
-/* ── Nav ────────────────────────────────────────── */
-.nav {
-  display: flex; gap: 4px;
-  margin-bottom: 24px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0;
-}
+      <div class="examples">
+        <span style="font-size:10px;color:var(--gray);letter-spacing:1px;align-self:center;">Exemple:</span>
+        <button class="example-chip" data-ticker="AAPL">AAPL</button>
+        <button class="example-chip" data-ticker="TSLA">TSLA</button>
+        <button class="example-chip" data-ticker="MSFT">MSFT</button>
+        <button class="example-chip" data-ticker="NVDA">NVDA</button>
+        <button class="example-chip" data-ticker="AMZN">AMZN</button>
+        <button class="example-chip" data-ticker="OMV.DE">OMV.DE</button>
+        <button class="example-chip" data-ticker="BTC-USD">BTC-USD</button>
+        <button class="example-chip" data-ticker="TLV.RO">TLV.RO</button>
+      </div>
 
-.nav-btn {
-  background: none; border: none;
-  padding: 10px 18px;
-  color: var(--gray); font-family: var(--font-mono); font-size: 11px;
-  cursor: pointer; letter-spacing: 1px; text-transform: uppercase;
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s; margin-bottom: -1px;
-}
-.nav-btn:hover { color: var(--white); }
-.nav-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
+      <div id="history-container" class="examples" style="margin-top:10px; display:none;">
+        <span style="font-size:10px;color:var(--gray);letter-spacing:1px;align-self:center;">Istoric:</span>
+        <div id="history-list"></div>
+      </div>
+    </div>
 
-/* ── Sections ───────────────────────────────────── */
-.section { display: none; }
-.section.active { display: block; }
+    <div id="status" class="status" style="display:none"></div>
 
-/* ── Input panel ────────────────────────────────── */
-.input-panel {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 24px;
-  margin-bottom: 24px;
-}
+    <div id="results-section" style="display:none">
 
-.input-row {
-  display: flex; gap: 12px; align-items: flex-end;
-  flex-wrap: wrap; margin-bottom: 16px;
-}
+      <!-- ── PANOU VALUARE FUNDAMENTALA ─────────────────── -->
+      <div id="valuation-panel" style="display:none">
+        <div class="val-header" onclick="toggleValuare()">
+          <span class="val-title">📐 Valuare Fundamentală
+            <span style="font-size:9.5px;color:rgba(255,255,255,0.3);font-weight:400;margin-left:8px;">
+              PE · FCF · NAV · DCF · Ponderat pe sector
+            </span>
+          </span>
+          <button class="val-toggle-btn" id="val-toggle-icon">▼ Extinde</button>
+        </div>
+        <div id="val-content" style="display:none">
 
-.input-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 180px; }
+          <!-- ── Nota unitati ──────────────────────────── -->
+          <div style="margin-bottom:11px;padding:7px 11px;
+                      background:rgba(255,238,88,0.05);border:1px solid rgba(255,238,88,0.18);
+                      border-radius:7px;font-size:10.5px;color:rgba(255,238,88,0.75);line-height:1.6;">
+            <strong style="color:rgba(255,238,88,0.95)">ℹ️ Unități:</strong>
+            &nbsp;Active / Cash / Datorii → <strong>milioane</strong>
+            <span style="opacity:0.65">(ex: 10 miliarde = <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;font-size:10px">10000</code>)</span>
+            &nbsp;·&nbsp; Acțiuni → <strong>milioane acțiuni</strong>
+            <span style="opacity:0.65">(ex: 152 mil acț = <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;font-size:10px">152</code>)</span>
+            &nbsp;·&nbsp; EPS / FCF → <strong>$/acțiune</strong>
+          </div>
 
-label {
-  font-size: 10px; letter-spacing: 1.5px;
-  text-transform: uppercase; color: var(--gray);
-}
+          <!-- ── Grup 1: Sector + evaluare per actiune + DCF ── -->
+          <div style="font-size:9px;font-weight:700;color:rgba(79,195,247,0.40);
+                      letter-spacing:0.8px;text-transform:uppercase;margin-bottom:5px;">
+            📊 Sector &amp; evaluare per acțiune
+          </div>
+          <div style="display:grid;grid-template-columns:1.5fr repeat(8,1fr);gap:7px;margin-bottom:12px;">
+            <div class="val-input-group">
+              <label for="val-sector">Sector</label>
+              <select id="val-sector">
+                <option value="tech">Tech / Software</option>
+                <option value="energy">Energie (Oil&amp;Gas)</option>
+                <option value="utilitati">Utilitati / Retele</option>
+                <option value="healthcare">Healthcare / Farma</option>
+                <option value="banci">Bănci</option>
+                <option value="asigurari">Asigurări</option>
+                <option value="materiale">Materiale / Miniere</option>
+                <option value="auto">Auto / Industrie auto</option>
+                <option value="conglomerate">Conglomerate / Ind.</option>
+                <option value="consum">Bunuri larg consum</option>
+                <option value="reit">REIT / Imobiliare</option>
+                <option value="shipping">Shipping / Transport</option>
+                <option value="tutun">Tutun / Tobacco</option>
+              </select>
+            </div>
+            <div class="val-input-group">
+              <label for="val-eps">EPS ($/acț)</label>
+              <input id="val-eps" type="number" placeholder="ex: 6.50" step="0.01">
+            </div>
+            <div class="val-input-group">
+              <label for="val-pe">P/E corect</label>
+              <input id="val-pe" type="number" placeholder="ex: 18" step="0.5">
+            </div>
+            <div class="val-input-group">
+              <label for="val-fcf">FCF/acț ($)</label>
+              <input type="number" id="val-fcf" placeholder="ex: 5.20" step="0.01">
+            </div>
+            <div class="val-input-group">
+              <label for="val-growth">Creștere (%)</label>
+              <input type="number" id="val-growth" placeholder="ex: 5" step="0.1" value="5">
+            </div>
+            <div class="val-input-group">
+              <label for="val-dividend">Dividend/acț</label>
+              <input type="number" id="val-dividend" placeholder="ex: 1.20" step="0.01">
+            </div>
+          </div>
 
-input[type=text] {
-  background: var(--bg); border: 1px solid var(--border);
-  color: var(--white); font-family: var(--font-mono); font-size: 15px;
-  padding: 10px 14px; border-radius: 6px; outline: none;
-  transition: border-color 0.2s; letter-spacing: 1px;
-  text-transform: uppercase;
-}
-input[type=text]:focus { border-color: var(--blue); }
+          <!-- ── Grup 2: Bilant (toate in milioane) ────── -->
+          <div style="font-size:9px;font-weight:700;color:rgba(79,195,247,0.40);
+                      letter-spacing:0.8px;text-transform:uppercase;margin-bottom:5px;">
+            🏦 Bilanț <span style="color:rgba(255,238,88,0.55);font-weight:600">(milioane — M)</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:14px;">
+            <div class="val-input-group">
+              <label for="val-assets">Active totale (M)</label>
+              <input type="number" id="val-assets" placeholder="ex: 10000" step="1">
+            </div>
+            <div class="val-input-group">
+              <label for="val-cash">Cash (M)</label>
+              <input type="number" id="val-cash" placeholder="ex: 1200" step="1">
+            </div>
+            <div class="val-input-group">
+              <label for="val-debt">Datorii (M)</label>
+              <input type="number" id="val-debt" placeholder="ex: 3500" step="1">
+            </div>
+            <div class="val-input-group">
+              <label for="val-shares">Acțiuni (M)</label>
+              <input type="number" id="val-shares" placeholder="ex: 152" step="1">
+            </div>
+            <div class="val-input-group" id="val-occupancy-group" style="opacity:0.45;transition:opacity 0.2s;">
+              <label for="val-occupancy" title="Procentul de spații închiriate din totalul disponibil — relevant doar pentru REIT-uri">Rată Ocupare (%)</label>
+              <input type="number" id="val-occupancy" placeholder="ex: 95" step="0.1" min="0" max="100">
+            </div>
+            <div class="val-input-group">
+              <label for="val-wacc" title="Costul mediu ponderat al capitalului — rata cu care se actualizează fluxurile viitoare în calculul DCF">WACC (%) <span style="font-size:8px;color:rgba(79,195,247,0.5);">↳ DCF</span></label>
+              <input type="number" id="val-wacc" placeholder="ex: 9" step="0.1" value="9">
+            </div>
+            <div class="val-input-group">
+              <label for="val-tgr" title="Rata de creștere terminală — creșterea anuală perpetuă asumată după cei 10 ani de prognoză DCF">TGR (%) <span style="font-size:8px;color:rgba(79,195,247,0.5);">↳ DCF</span></label>
+              <input type="number" id="val-tgr" placeholder="ex: 2.5" step="0.1" value="2.5">
+            </div>
+          </div>
 
-/* ── Toggle sentiment ───────────────────────────── */
-.toggle-row {
-  display: flex; align-items: center; gap: 10px;
-  margin-bottom: 16px;
-}
+          <!-- Pret curent — folosit de AI validator (ascuns) -->
+          <span id="val-current-price" style="display:none;" data-price="" data-currency="USD"></span>
 
-.toggle-label { font-size: 11px; color: var(--gray); letter-spacing: 1px; }
+          <!-- ── Grup REIT — vizibil doar cand sector = reit ── -->
+          <div id="val-reit-block" style="display:none; margin-bottom:10px;">
+            <div style="font-size:9px;font-weight:700;color:rgba(79,195,247,0.40);
+                        letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;">
+              🏢 Metrici REIT
+              <span style="color:rgba(255,238,88,0.5);font-weight:600;font-size:8.5px;">
+                (auto-completate din Yahoo)
+              </span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(1,1fr);gap:7px;">
+              <div class="val-input-group">
+                <label for="val-ltv" style="color:rgba(79,195,247,0.8);">LTV %
+                  <span style="font-size:8.5px;color:rgba(79,195,247,0.45);">(Datorii/Active)</span>
+                </label>
+                <input type="number" id="val-ltv" placeholder="ex: 35.2" step="0.1" min="0" max="100"
+                       style="border-color:rgba(79,195,247,0.3);">
+              </div>
+            </div>
+          </div>
 
-.toggle {
-  position: relative; width: 42px; height: 22px;
-}
-.toggle input { opacity: 0; width: 0; height: 0; }
-.toggle-slider {
-  position: absolute; inset: 0;
-  background: var(--border); border-radius: 22px;
-  cursor: pointer; transition: 0.3s;
-}
-.toggle-slider::before {
-  content: ''; position: absolute;
-  width: 16px; height: 16px; border-radius: 50%;
-  background: var(--gray); bottom: 3px; left: 3px;
-  transition: 0.3s;
-}
-.toggle input:checked + .toggle-slider { background: var(--accent); }
-.toggle input:checked + .toggle-slider::before {
-  background: var(--white); transform: translateX(20px);
-}
+          <!-- ── Buton Validare AI ── -->
+          <div style="margin-bottom:8px;">
+            <button id="val-ai-validate-btn" onclick="window._runAIValidation()"
+              style="display:none;padding:5px 15px;border-radius:14px;
+                     border:1px solid rgba(79,195,247,0.4);background:rgba(79,195,247,0.07);
+                     color:#4fc3f7;font-size:10.5px;font-weight:700;cursor:pointer;
+                     letter-spacing:0.3px;transition:opacity 0.2s;">
+              🤖 Validare AI
+            </button>
+          </div>
 
-/* ── Examples ───────────────────────────────────── */
-.examples { display: flex; gap: 8px; flex-wrap: wrap; }
-.example-chip {
-  background: var(--panel2); border: 1px solid var(--border);
-  padding: 4px 12px; border-radius: 20px;
-  color: var(--gray); font-family: var(--font-mono); font-size: 11px;
-  cursor: pointer; transition: all 0.2s; letter-spacing: 1px;
-}
-.example-chip:hover { border-color: var(--blue); color: var(--blue); }
+          <!-- AI Validator output — populated dynamically -->
+          <div id="val-ai-validation"></div>
 
-/* ── Run button ─────────────────────────────────── */
-.run-btn {
-  background: linear-gradient(135deg, var(--accent), #5a4af0);
-  border: none; color: var(--white);
-  font-family: var(--font-sans); font-weight: 700;
-  font-size: 13px; letter-spacing: 1px; text-transform: uppercase;
-  padding: 12px 28px; border-radius: 6px; cursor: pointer;
-  transition: all 0.2s; white-space: nowrap;
-}
-.run-btn:hover:not(:disabled) { filter: brightness(1.15); transform: translateY(-1px); }
-.run-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+          <div id="val-results-grid" class="val-results-grid">
+            <!-- populated dynamically -->
+          </div>
+          <div style="margin-top:10px;font-size:9px;color:rgba(255,255,255,0.20);line-height:1.6;">
+            NAV: (Active + Cash − Datorii) / Acțiuni_M &nbsp;·&nbsp;
+            DCF: FCF × (1+g)ⁿ actualizat cu WACC, 10 ani + valoare terminală &nbsp;·&nbsp;
+            Marja = (Val.Ponderata − Pret) / Pret
+          </div>
+        </div>
+      </div>
 
-/* ── Status ─────────────────────────────────────── */
-.status {
-  padding: 10px 16px; border-radius: 6px;
-  font-size: 11px; letter-spacing: 0.5px; margin-bottom: 16px;
-}
-.status--info  { background: rgba(79,195,247,0.1); border: 1px solid rgba(79,195,247,0.3); color: var(--blue); }
-.status--error { background: rgba(239,83,80,0.1);  border: 1px solid rgba(239,83,80,0.3);  color: var(--red); }
-.status--warn  { background: rgba(255,167,38,0.1); border: 1px solid rgba(255,167,38,0.3); color: var(--orange); }
+      <div class="stock-bar">
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+            <div id="stock-name" class="stock-name">—</div>
+            <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+              <div id="val-score-inline" style="display:none;"></div>
+            </div>
+            <button id="save-watchlist-btn" style="display:none; flex-shrink:0; padding:6px 14px;
+                 border-radius:20px; border:1px solid rgba(79,195,247,0.4);
+                 background:rgba(79,195,247,0.08); color:#4fc3f7; font-size:11.5px;
+                 cursor:pointer; font-weight:600; letter-spacing:0.3px; transition:all 0.2s;"
+                 onmouseover="this.style.background='rgba(79,195,247,0.18)'"
+                 onmouseout="this.style.background='rgba(79,195,247,0.08)'">
+              📌 Adaugă la urmărit
+            </button>
+          </div>
+          <div id="stock-ticker" class="stock-ticker">—</div>
+          <div id="sector-badge"></div>
+          <div style="margin-top:8px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+            <div style="font-size:11px; letter-spacing:1.5px; text-transform:uppercase;
+                        color:rgba(124,106,247,0.8); font-family:var(--font-sans);">
+              🎲 Simulare Monte Carlo · 30 000 scenarii · GBM + GARCH(1,1) + Student-t · Sentiment AI
+            </div>
+            <div id="sim-score-inline" style="display:none; flex-shrink:0;"></div>
+          </div>
+          <div id="quality-comment" style="display:none; margin-top:10px; padding:9px 13px;
+               border-radius:8px; border:1px solid rgba(255,255,255,0.08);
+               background:rgba(255,255,255,0.03); font-size:11.5px; line-height:1.65;
+               color:rgba(255,255,255,0.60); max-width:560px;"></div>
+          <div class="info-pills">
+          <div style="width:100%; margin-bottom:4px; font-size:10.5px; color:rgba(255,255,255,0.30);
+                      letter-spacing:0.5px; text-transform:uppercase; font-weight:600;">
+            Parametrii simularii &nbsp;·&nbsp; hover pe
+            <i class="tip-icon" style="pointer-events:none; vertical-align:middle;">i</i>
+            pentru detalii
+          </div>
 
-/* ── Results section — reordonare flex ──────────── */
-#results-section {
-  display: flex;
-  flex-direction: column;
-}
-.stock-bar      { order: 1; }
-.price-chart-box { order: 2; }
-#valuation-panel { order: 3; }
-.period-tabs    { order: 4; }
-#chart-area     { order: 5; }
-/* comentariu fundamental — sub panelul de valuare */
-#val-fundamental-comment {
-  background: linear-gradient(135deg, rgba(18,18,31,0.95) 0%, rgba(26,26,46,0.95) 100%);
-  border: 1px solid rgba(124,106,247,0.25);
-  border-radius: 8px;
-  padding: 14px 18px;
-  margin-top: 14px;
-  font-size: 11.5px;
-  line-height: 1.7;
-  color: var(--white);
-}
-#val-fundamental-comment .vfc-title {
-  font-family: var(--font-sans);
-  font-size: 11px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: rgba(124,106,247,0.8);
-  margin-bottom: 8px;
-}
-#val-fundamental-comment .vfc-row {
-  margin-bottom: 5px;
-}
-#val-fundamental-comment .vfc-entry-box {
-  background: rgba(124,106,247,0.08);
-  border: 1px solid rgba(124,106,247,0.2);
-  border-radius: 6px;
-  padding: 10px 14px;
-  margin-top: 10px;
-  font-size: 11px;
-}
-#val-fundamental-comment .vfc-entry-box strong {
-  display: block;
-  font-family: var(--font-sans);
-  font-size: 10px;
-  letter-spacing: 1px;
-  color: rgba(124,106,247,0.7);
-  text-transform: uppercase;
-  margin-bottom: 4px;
-}
+          <!-- VIX — INDICELE PIETEI -->
+          <div class="pill" id="pill-vix" style="display:none;">
+            <span class="tip-wrap">
+              VIX:
+              <i class="tip-icon" id="pill-vix-tip-icon">i</i>
+              <div class="tip-bubble">
+                <strong>😱 VIX — Indicele fricii pietei</strong>
+                Masoara volatilitatea <em>implicita</em> asteptata de piata pe urmatoarele 30 de zile. Cu cat e mai mare, cu atat piata anticipeaza miscari bruste.
+                <div class="tip-scale" style="margin-top:6px">
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> &lt; 15 — piata calma, sigma normala</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ffee58"></span> 15–25 — normal, impact minor</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ffa726"></span> 25–35 — ingrijorare, sigma +20%</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ef5350"></span> &gt; 35 — panica, sigma +40%</div>
+                </div>
+                <span class="tip-impact" id="pill-vix-tip-impact">Influenteaza: sigma in simulare</span>
+              </div>
+            </span>
+            <span id="info-vix">—</span>
+          </div>
 
-/* ── Stock info bar ─────────────────────────────── */
-.stock-bar {
-  background: var(--panel);
-  border: 1px solid var(--border); border-radius: 8px;
-  padding: 16px 20px; margin-bottom: 20px;
-  display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
-}
+          <!-- SIGMA STATICA -->
+          <div class="pill" id="pill-sigma">
+            <span class="tip-wrap">
+              σ/zi:
+              <i class="tip-icon">i</i>
+              <div class="tip-bubble">
+                <strong>📊 Sigma zilnica (statica)</strong>
+                Media volatilitatii zilnice calculate din ultimul an de tranzactionare.
+                <div class="tip-scale">
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> &lt; 1%/zi — calm (ETF, indici)</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ffee58"></span> 1–2%/zi — normal (actiuni mari)</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ef5350"></span> &gt; 2%/zi — volatil (crypto, meme)</div>
+                </div>
+                <span class="tip-impact">Influenteaza: dispersia scenariilor simulate</span>
+              </div>
+            </span>
+            <span id="info-sigma">—</span>
+          </div>
 
-.stock-name  { font-family: var(--font-sans); font-size: 32px; font-weight: 700; }
-.stock-ticker { color: var(--gray); font-size: 11px; letter-spacing: 2px; }
-.stock-price { font-size: 22px; font-weight: 700; color: var(--green); margin-left: auto; font-family: var(--font-sans); }
+          <!-- IV — VOLATILITATE IMPLICITA DIN OPTIUNI -->
+          <div class="pill" id="pill-iv">
+            <span class="tip-wrap">
+              IV opt:
+              <i class="tip-icon">i</i>
+              <div class="tip-bubble">
+                <strong>📉 Volatilitate Implicita (Optiuni)</strong>
+                Ce plateste piata <em>acum</em> pentru risc pe urmatoarele ~30 de zile — forward-looking, nu bazata pe trecut. Extrase din contractul ATM cel mai apropiat de 30 zile.
+                <div class="tip-scale" style="margin-top:5px">
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> IV &lt; sigma istorica — piata calma</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ffee58"></span> IV ≈ sigma istorica — risc normal</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ef5350"></span> IV &gt; sigma istorica — eveniment iminent</div>
+                </div>
+                <div style="margin-top:6px;font-size:10.5px">
+                  IV are greutate <b>70%</b> pe 30 zile si scade la <b>10%</b> pe 360 zile.
+                </div>
+                <span class="tip-impact">Influenteaza: sigma in simulare, mai ales pe termen scurt</span>
+              </div>
+            </span>
+            <span id="info-iv">—</span>
+          </div>
 
-.info-pills { display: flex; gap: 12px; flex-wrap: wrap; }
-.pill {
-  background: var(--panel2); border: 1px solid var(--border);
-  padding: 4px 10px; border-radius: 4px; font-size: 10px;
-  letter-spacing: 0.5px;
-}
-.pill span { color: var(--blue); font-weight: 700; }
+          <!-- PUT/CALL SKEW -->
+          <div class="pill" id="pill-skew">
+            <span class="tip-wrap">
+              Skew:
+              <i class="tip-icon">i</i>
+              <div class="tip-bubble">
+                <strong>📐 Put/Call Skew — Directie implicita</strong>
+                Diferenta de IV intre put-urile OTM (~7% sub pret) si call-urile OTM (~7% peste pret). Reflecta cat de mult se teme piata de o scadere vs cat spera la o crestere.
+                <div class="tip-scale" style="margin-top:5px">
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> &lt; 0% — call-uri mai scumpe, sentiment bullish (rar)</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ffee58"></span> 0–8% — skew normal pentru actiuni</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ffa726"></span> 8–15% — teama crescuta de scadere</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ef5350"></span> &gt; 15% — protectie impotriva crashului</div>
+                </div>
+                <div style="margin-top:6px;font-size:10.5px">
+                  Skew ridicat → drift ajustat in jos. Skew negativ (neobisnuit) → drift ajustat in sus.
+                </div>
+                <span class="tip-impact">Influenteaza: drift in ambele simulari (clasica + AI)</span>
+              </div>
+            </span>
+            <span id="info-skew">—</span>
+          </div>
 
-/* ── Price chart ────────────────────────────────── */
-.price-chart-box {
-  background: var(--panel); border: 1px solid var(--border);
-  border-radius: 8px; padding: 16px; margin-bottom: 20px;
-}
-.chart-label { font-size: 10px; color: var(--gray); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 12px; }
-.canvas-wrap { position: relative; height: 220px; }
-.canvas-wrap-lg { position: relative; height: 300px; }
+          <!-- GARCH ACTUAL -->
+          <div class="pill" id="pill-garch">
+            <span class="tip-wrap">
+              GARCH:
+              <i class="tip-icon">i</i>
+              <div class="tip-bubble">
+                <strong>📈 GARCH(1,1) — Volatilitate actuala</strong>
+                Volatilitatea conditionata <em>acum</em>, estimata din ultimele 60 de zile. Reflecta regimul curent al pietei, nu media istorica.
+                <div class="tip-scale">
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> 🟢 sub medie — piata calma</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ffee58"></span> 🟡 aproape de medie — normal</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ef5350"></span> 🔴 peste medie — piata agitata</div>
+                </div>
+                <span class="tip-impact">Influenteaza: volatilitatea de start in simulare</span>
+              </div>
+            </span>
+            <span id="info-garch">—</span>
+          </div>
 
-/* ── Period tabs ────────────────────────────────── */
-.period-tabs {
-  display: flex; gap: 4px; margin-bottom: 16px;
-}
-.tab-btn {
-  background: var(--panel2); border: 1px solid var(--border);
-  padding: 8px 18px; border-radius: 6px;
-  color: var(--gray); font-family: var(--font-mono); font-size: 11px;
-  cursor: pointer; letter-spacing: 1px; transition: all 0.2s;
-}
-.tab-btn:hover { color: var(--white); border-color: var(--gray); }
-.tab-btn.active { background: var(--accent); border-color: var(--accent); color: var(--white); }
+          <!-- STUDENT-t ν -->
+          <div class="pill" id="pill-nu">
+            <span class="tip-wrap">
+              Fat-t:
+              <i class="tip-icon">i</i>
+              <div class="tip-bubble">
+                <strong>📉 Distributie Student-t(ν)</strong>
+                Distributia normala subestimeaza dramatic crashurile. Student-t corecteaza asta prin cozi mai groase.
+                <div class="tip-scale" style="margin-top:5px">
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ef5350"></span> ν = 3–4 — cozi f. groase (crypto)</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ffa726"></span> ν = 5–7 — cozi groase (TSLA, NVDA)</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ffee58"></span> ν = 8–15 — cozi medii (actiuni normale)</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> ν &gt; 20 — practic normal (indici)</div>
+                </div>
+                <span class="tip-impact">Influenteaza: frecventa evenimentelor extreme</span>
+              </div>
+            </span>
+            <span id="info-nu">—</span>
+          </div>
 
-/* ── Chart grid ─────────────────────────────────── */
-.chart-grid {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 16px; margin-bottom: 16px;
-}
-@media (max-width: 720px) { .chart-grid { grid-template-columns: 1fr; } }
+          <!-- VOL. ANUALA -->
+          <div class="pill" id="pill-vol">
+            <span class="tip-wrap">
+              Vol/an:
+              <i class="tip-icon">i</i>
+              <div class="tip-bubble">
+                <strong>📅 Volatilitate anualizata</strong>
+                Sigma zilnica × √252 — standardul din industrie pentru compararea riscului intre active.
+                <div class="tip-scale">
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> &lt; 20% — actiuni stabile (JNJ, KO)</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ffee58"></span> 20–40% — volatilitate medie</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ef5350"></span> &gt; 40% — very volatile (crypto, meme)</div>
+                </div>
+                <span class="tip-impact">Indicator general de risc al activului</span>
+              </div>
+            </span>
+            <span id="info-vol">—</span>
+          </div>
 
-.chart-box {
-  background: var(--panel); border: 1px solid var(--border);
-  border-radius: 8px; padding: 16px;
-}
+          <!-- PERSISTENTA GARCH -->
+          <div class="pill" id="pill-pers">
+            <span class="tip-wrap">
+              Pers:
+              <i class="tip-icon">i</i>
+              <div class="tip-bubble">
+                <strong>🔄 Persistenta GARCH (α+β)</strong>
+                Cat de "lipicioasa" e volatilitatea — cat timp dureaza un soc pana se disipa.
+                <div class="tip-scale">
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> &lt; 85% — socurile dispar rapid</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ffee58"></span> 85–95% — volatilitate persistenta</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ef5350"></span> &gt; 95% — soc dureaza saptamani</div>
+                </div>
+                <span class="tip-impact">Influenteaza: viteza de normalizare dupa soc</span>
+              </div>
+            </span>
+            <span id="info-pers">—</span>
+          </div>
 
-/* ── Stats card ─────────────────────────────────── */
-.stats-card {
-  background: var(--panel); border: 1px solid var(--border);
-  border-radius: 8px; padding: 20px; margin-bottom: 16px;
-}
-.stats-title {
-  font-family: var(--font-sans); font-size: 14px; font-weight: 700;
-  margin-bottom: 16px; color: var(--white);
-}
-.stats-table { width: 100%; border-collapse: collapse; }
-.stats-table th {
-  text-align: right; font-size: 10px; letter-spacing: 1px;
-  text-transform: uppercase; color: var(--gray); padding: 4px 8px;
-}
-.stats-table th:first-child { text-align: left; }
-.stat-label { color: var(--gray); font-size: 11px; padding: 5px 0; }
-.stat-val   { text-align: right; font-size: 12px; padding: 5px 8px; font-weight: 700; }
-.ai-col     { color: var(--orange) !important; }
-.stat-sep   { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--border); padding: 8px 0 4px; border-top: 1px solid var(--border); }
-.stats-footer { font-size: 9px; color: var(--gray); margin-top: 12px; text-align: right; letter-spacing: 1px; }
+          <!-- DRIFT -->
+          <div class="pill" id="pill-drift">
+            <span class="tip-wrap">
+              Drift:
+              <i class="tip-icon">i</i>
+              <div class="tip-bubble">
+                <strong>📈 Drift — Tendinta zilnica</strong>
+                Directia medie a pretului per zi din ultimul an. Influenteaza direct unde se concentreaza simularile.
+                <div class="tip-scale">
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> &gt; 0 — tendinta de crestere</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#888"></span> ≈ 0 — piata laterala</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ef5350"></span> &lt; 0 — tendinta de scadere</div>
+                </div>
+                <span class="tip-impact">Influenteaza: media preturilor simulate</span>
+              </div>
+            </span>
+            <span id="info-drift">—</span>
+          </div>
 
-/* ── Sentiment section ──────────────────────────── */
-.sent-header {
-  display: flex; align-items: baseline; gap: 16px; margin-bottom: 8px;
-}
-.sent-score-label { font-size: 10px; color: var(--gray); letter-spacing: 2px; text-transform: uppercase; }
-#sent-global { font-size: 28px; font-family: var(--font-sans); font-weight: 800; }
-#sent-conclusion { color: var(--gray); font-size: 11px; margin-bottom: 6px; }
-#sent-sources { font-size: 10px; color: var(--border); letter-spacing: 0.5px; margin-bottom: 16px; }
+          <!-- MA60 -->
+          <div class="pill" id="pill-ma60">
+            <span class="tip-wrap">
+              MA60:
+              <i class="tip-icon">i</i>
+              <div class="tip-bubble tip-left">
+                <strong>〰️ Media mobila 60 zile</strong>
+                Cat de departe e pretul curent fata de media pe 60 de zile. Deviatia mare declanseaza mean reversion in simulare.
+                <div class="tip-scale">
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> &lt; 5% — pret aproape de medie</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ffee58"></span> 5–15% — deviere moderata</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ef5350"></span> &gt; 15% — deviere semnificativa</div>
+                </div>
+                <span class="tip-impact">Influenteaza: mean reversion in GBM</span>
+              </div>
+            </span>
+            <span id="info-ma50">—</span>
+          </div>
 
-/* ── Factor cards ───────────────────────────────── */
-.factors-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 12px; margin-top: 16px;
-}
+          <!-- KAPPA OU — VITEZA MEAN REVERSION -->
+          <div class="pill" id="pill-kappa" style="display:none;">
+            <span class="tip-wrap">
+              κ<sub>S</sub>:
+              <i class="tip-icon">i</i>
+              <div class="tip-bubble tip-left">
+                <strong>🔄 κ<sub>S</sub> — Viteza Mean Reversion (OU)</strong>
+                Parametrul de revenire al procesului Ornstein-Uhlenbeck. Cat de repede pretul revine spre media de echilibru μ. Estimat prin OLS pe log-preturi.
+                <div class="tip-scale">
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> &gt; 0.05 — revenire rapida (&lt; 14 zile T½)</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ffee58"></span> 0.01–0.05 — revenire moderata</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ef5350"></span> &lt; 0.01 — aproape random walk</div>
+                </div>
+                <span class="tip-impact">Influenteaza: viteza cu care P50 OU+Heston converge spre μ</span>
+              </div>
+            </span>
+            <span id="info-kappa">—</span>
+          </div>
 
-.factor-card {
-  background: var(--panel2); border: 1px solid var(--border);
-  border-radius: 6px; padding: 12px;
-}
-.factor-card.bullish { border-left: 3px solid var(--green); }
-.factor-card.bearish { border-left: 3px solid var(--red); }
-.factor-card.neutru  { border-left: 3px solid var(--yellow); }
+          <!-- VOL TREND -->
+          <div class="pill" id="pill-voltren">
+            <span class="tip-wrap">
+              Vol:
+              <i class="tip-icon">i</i>
+              <div class="tip-bubble tip-left">
+                <strong>🔊 Trend volum tranzactionare</strong>
+                Volumul din ultimele 10 zile vs media pe 30 de zile, corelat cu directia pretului.
+                <div class="tip-scale">
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> Bullish — volum mare + pret sus</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#888"></span> Neutral — fara confirmare</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#ef5350"></span> Bearish — volum mare + pret jos</div>
+                </div>
+                <span class="tip-impact">Influenteaza: ajustarea drift-ului AI</span>
+              </div>
+            </span>
+            <span id="info-voltren">—</span>
+          </div>
 
-.factor-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.factor-label  { font-size: 12px; font-weight: 700; flex: 1; }
-.factor-score  { font-family: var(--font-mono); font-size: 12px; color: var(--blue); }
-.factor-impact { font-size: 9px; letter-spacing: 1.5px; padding: 2px 6px; border-radius: 3px; }
-.impact-bullish { background: rgba(102,187,106,0.15); color: var(--green); }
-.impact-bearish { background: rgba(239,83,80,0.15);  color: var(--red); }
-.impact-neutru  { background: rgba(255,238,88,0.1);  color: var(--yellow); }
+          <div id="val-fundamental-comment" style="display:none; margin-top:12px;"></div>
+          <div id="ou-results-section"></div>
+        </div>
+        <div id="stock-price" class="stock-price">—</div>
+      </div>
 
-.factor-count { font-size: 9px; color: var(--gray); margin-bottom: 6px; }
-.factor-news  { font-size: 10px; padding: 2px 0; border-top: 1px solid var(--border); margin-top: 3px; line-height: 1.4; }
+      <div class="price-chart-box">
+        <div class="chart-label">Pret istoric — ultimele 60 zile</div>
+        <div class="canvas-wrap"><canvas id="price-chart"></canvas></div>
+      </div>
 
-/* ── About section ──────────────────────────────── */
-.about-content {
-  background: var(--panel); border: 1px solid var(--border);
-  border-radius: 8px; padding: 28px; line-height: 1.8;
-}
-.about-content h2 { font-family: var(--font-sans); font-size: 18px; margin-bottom: 16px; color: var(--blue); }
-.about-content h3 { font-family: var(--font-sans); font-size: 13px; margin: 20px 0 8px; color: var(--yellow); letter-spacing: 1px; }
-.about-content p  { color: var(--gray); font-size: 12px; margin-bottom: 12px; }
-.about-content code {
-  background: var(--panel2); padding: 2px 6px; border-radius: 3px;
-  color: var(--blue); font-family: var(--font-mono); font-size: 11px;
-}
-.formula {
-  background: var(--panel2); border: 1px solid var(--border);
-  padding: 16px; border-radius: 6px; margin: 16px 0;
-  color: var(--green); font-family: var(--font-mono); font-size: 13px;
-  letter-spacing: 0.5px;
-}
-.disclaimer {
-  background: rgba(239,83,80,0.06); border: 1px solid rgba(239,83,80,0.2);
-  padding: 16px; border-radius: 6px; margin-top: 24px;
-  color: rgba(239,83,80,0.8); font-size: 11px; line-height: 1.6;
-}
+      <div id="period-tabs" class="period-tabs"></div>
+      <div id="chart-area"></div>
+    </div>
 
+    <div id="sentiment-section" style="display:none">
+      <div class="chart-box" style="margin-bottom:16px">
+        <div class="sent-header">
+          <span class="sent-score-label">Sentiment global</span>
+          <span id="sent-global">—</span>
+        </div>
+        <div id="sent-conclusion"></div>
+        <div id="sent-sources"></div>
+        <div class="canvas-wrap-lg"><canvas id="sentiment-chart"></canvas></div>
+      </div>
+      <div id="factors-detail" class="factors-grid"></div>
+    </div>
 
+  </section>
 
-/* ── Istoric scroll orizontal ─────────────────── */
-#history-list {
-  display: flex;
-  gap: 8px;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  padding-bottom: 6px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.2) transparent;
-}
+  <!-- ── SECTIUNEA URMARIT ──────────────────────────── -->
+  <section id="watchlist-section" class="section">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+      <div>
+        <div style="font-size:17px; font-weight:700; color:#e0e0e0; letter-spacing:0.5px;">📌 Vandute de urmărit</div>
+        <div style="font-size:11px; color:rgba(255,255,255,0.35); margin-top:3px;">Snapshot-uri salvate din simulari anterioare</div>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button id="export-watchlist-btn" style="padding:7px 16px; border-radius:20px;
+             border:1px solid rgba(102,187,106,0.4); background:rgba(102,187,106,0.08);
+             color:#66bb6a; font-size:11.5px; cursor:pointer; font-weight:600;"
+             onmouseover="this.style.background='rgba(102,187,106,0.18)'"
+             onmouseout="this.style.background='rgba(102,187,106,0.08)'">
+          ⬇ Export HTML
+        </button>
+        <button id="import-watchlist-btn" style="padding:7px 16px; border-radius:20px;
+             border:1px solid rgba(79,195,247,0.4); background:rgba(79,195,247,0.07);
+             color:#4fc3f7; font-size:11.5px; cursor:pointer; font-weight:600;"
+             onmouseover="this.style.background='rgba(79,195,247,0.16)'"
+             onmouseout="this.style.background='rgba(79,195,247,0.07)'">
+          ⬆ Import HTML
+        </button>
+        <input type="file" id="import-watchlist-input" accept=".html" multiple
+               style="display:none;">
+        <button id="clear-watchlist-btn" style="padding:7px 16px; border-radius:20px;
+             border:1px solid rgba(239,83,80,0.3); background:rgba(239,83,80,0.06);
+             color:#ef5350; font-size:11.5px; cursor:pointer; font-weight:600;"
+             onmouseover="this.style.background='rgba(239,83,80,0.15)'"
+             onmouseout="this.style.background='rgba(239,83,80,0.06)'">
+          🗑 Șterge tot
+        </button>
+      </div>
+    </div>
+    <div id="watchlist-empty" style="text-align:center; padding:60px 20px; color:rgba(255,255,255,0.25); font-size:13px;">
+      Nicio acțiune salvată încă.<br>
+      <span style="font-size:11px;">Rulează o simulare și apasă 📌 Adaugă la urmărit.</span>
+    </div>
+    <div id="watchlist-cards" style="display:flex; flex-direction:column; gap:12px;"></div>
+  </section>
 
-#history-list::-webkit-scrollbar {
-  height: 4px;
-}
+  <section id="about-section" class="section">
+    <div class="about-content">
+      <h2>Cum functioneaza</h2>
 
-#history-list::-webkit-scrollbar-track {
-  background: transparent;
-}
+      <h3>Monte Carlo — Geometric Brownian Motion</h3>
+      <p>Programul simuleaza 30.000 de scenarii posibile pentru pretul unei actiuni
+         pe baza volatilitatii si trendului istoric din ultimul an.</p>
+      <div class="formula">Pret(t+1) = Pret(t) × exp(drift + sigma × Z)</div>
+      <p>Unde <code>drift</code> este tendinta medie zilnica, <code>sigma</code> este
+         volatilitatea zilnica, iar <code>Z</code> este un numar aleator din distributia normala.</p>
 
-#history-list::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.2);
-  border-radius: 4px;
-}
-/* ── Val method card — formula sub valoare ──────── */
-.vm-formula {
-  font-size: 9px;
-  color: rgba(255,255,255,0.35);
-  letter-spacing: 0.2px;
-  margin: 3px 0 4px;
-  line-height: 1.5;
-  word-break: break-word;
-}
-.val-method-card:hover .vm-formula {
-  color: rgba(255,255,255,0.65);
-}
+      <h3>Detectie sector + ponderi dinamice</h3>
+      <p>Aplicatia detecteaza automat sectorul actiunii (Technology, Energy, Financial Services etc.)
+         si aplica ponderi diferite celor 7 factori. De exemplu, pentru o companie de energie,
+         geopolitica si tarifele comerciale conteaza mai mult decat pentru o companie tech.</p>
 
-/* ── Scrollbar ──────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+      <h3>VIX — Indicele fricii</h3>
+      <p>VIX masoara volatilitatea implicita a pietei. Cand VIX depaseste 25,
+         sigma din simulare creste automat pentru a reflecta incertitudinea crescuta.</p>
+
+      <h3>Analiza Sentiment</h3>
+      <p>Stirile sunt descarcate din Yahoo Finance, Reuters RSS si Google News,
+         analizate cu VADER implementat local (fara API key) si clasificate in 7 factori,
+         fiecare ponderat in functie de sectorul actiunii.</p>
+
+      <div class="disclaimer">
+        ⚠️ DISCLAIMER: Aceasta aplicatie este o simulare matematica bazata pe date istorice
+        si analiza de sentiment automata. Nu reprezinta sfat financiar. Foloseste cu discernamant.
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js')
+        .then(reg => console.log('SW inregistrat', reg))
+        .catch(err => console.log('SW eroare', err));
+    });
+  }
+</script>
+<script type="module" src="./js/app.js"></script>
+<!script type="module" src="/Monte-Carlo-stock-Beta/js/app.js"><!/script>
+</body>
+</html>
