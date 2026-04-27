@@ -331,6 +331,28 @@ export async function fetchFinnhubSector(ticker) {
 
 
 
+// ── Heston calibrated params via proxy Render ─────────
+export async function fetchHestonCalibrated(ticker, currentPrice, onProgress) {
+  if (!MY_PROXY) return null;
+  try {
+    onProgress?.(`Heston: calibrez parametri pe suprafata IV (poate dura 15-25s)...`);
+    const r = await fetch(
+      `${MY_PROXY}/heston-calibrate/${encodeURIComponent(ticker)}?price=${currentPrice}`,
+      { signal: AbortSignal.timeout(35000) }
+    );
+    if (!r.ok) return null;
+    const d = await r.json();
+    if (!d?.v0 || !d?.kappa || !d?.theta || !d?.xi) return null;
+    onProgress?.(
+      `Heston calibrat ✓ — RMSE ${(d.rmse * 100).toFixed(2)}%, ${d.nPoints} puncte IV, ${d.nExpiries} expirari`
+    );
+    return d;   // { v0, kappa, theta, xi, rho, rmse, nPoints, nExpiries, convergence }
+  } catch (e) {
+    console.warn('[Heston calibrate] esuat:', e.message);
+    return null;
+  }
+}
+
 // ── Fetch robustez ────────────────────────────────────
 
 async function _yGet(url, timeoutMs = 8000) {
