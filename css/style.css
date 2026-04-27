@@ -242,7 +242,7 @@ input[type=text]:focus { border-color: var(--blue); }
 
 .stock-name  { font-family: var(--font-sans); font-size: 32px; font-weight: 700; }
 .stock-ticker { color: var(--gray); font-size: 11px; letter-spacing: 2px; }
-.stock-price { font-size: 22px; font-weight: 700; color: var(--green); margin-left: auto; font-family: var(--font-sans); }
+.stock-price { font-size: 22px; font-weight: 700; color: var(--green); font-family: var(--font-sans); }
 
 .info-pills { display: flex; gap: 12px; flex-wrap: wrap; }
 .pill {
