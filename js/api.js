@@ -541,9 +541,33 @@ async function _fetchYahooFundamentals(ticker) {
           const sharesRaw = _yv(ks.sharesOutstanding);
           const fcfTotal  = _yv(fd.freeCashflow);
           const totalAssetsRaw = _yv(fd.totalAssets) ?? _yv(bs.totalAssets) ?? _yv(bsQ.totalAssets);
-          const totalLiabRaw   = _yv(fd.totalLiabilities)
-                              ?? _yv(bs.totalLiabilitiesNetMinorityInterest)
-                              ?? _yv(bsQ.totalLiabilitiesNetMinorityInterest);
+          let totalLiabRaw   = _yv(fd.totalLiabilities)
+                          ?? _yv(bs.totalLiabilitiesNetMinorityInterest)
+                          ?? _yv(bsQ.totalLiabilitiesNetMinorityInterest)
+                          ?? _yv(bs.totalLiab)
+                          ?? _yv(bsQ.totalLiab);
+
+          // Fallback: fetch dedicat balance sheet dacă proxy nu l-a injectat (pre-redeploy)
+          if (totalLiabRaw == null && MY_PROXY) {
+            try {
+              const bsUrl = `${MY_PROXY}/proxy?url=${encodeURIComponent(
+                `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${ticker}?modules=balanceSheetHistory,balanceSheetHistoryQuarterly&formatted=false`
+              )}`;
+              const bsJ = await _yGet(bsUrl, 6000);
+              const bsR = bsJ?.quoteSummary?.result?.[0];
+              if (bsR) {
+                const bsF  = bsR.balanceSheetHistory?.balanceSheetStatements?.[0] || {};
+                const bsQF = bsR.balanceSheetHistoryQuarterly?.balanceSheetStatements?.[0] || {};
+                totalLiabRaw = _yv(bsF.totalLiabilitiesNetMinorityInterest)
+                            ?? _yv(bsF.totalLiab)
+                            ?? _yv(bsQF.totalLiabilitiesNetMinorityInterest)
+                            ?? _yv(bsQF.totalLiab);
+                // Dacă proxy (redeployed) a injectat deja în fd
+                if (totalLiabRaw == null && bsR.financialData?.totalLiabilities)
+                  totalLiabRaw = _yv(bsR.financialData.totalLiabilities);
+              }
+            } catch (_) {}
+          }
           const eps    = _yv(ks.trailingEps);
           const pe     = _yv(sd.trailingPE) ?? _yv(sd.forwardPE) ?? _yv(ks.trailingPE) ?? null;
           const growth = _yv(fd.earningsGrowth)      != null ? _yv(fd.earningsGrowth)      * 100
@@ -600,7 +624,9 @@ async function _fetchYahooFundamentals(ticker) {
         const _aV  = _yv(fd.totalAssets) ?? _yv(bs.totalAssets) ?? _yv(bsQ.totalAssets);
         const _lV  = _yv(fd.totalLiabilities)
                   ?? _yv(bs.totalLiabilitiesNetMinorityInterest)
-                  ?? _yv(bsQ.totalLiabilitiesNetMinorityInterest);
+                  ?? _yv(bs.totalLiab)
+                  ?? _yv(bsQ.totalLiabilitiesNetMinorityInterest)
+                  ?? _yv(bsQ.totalLiab);
         const ltv  = (_dV != null && _aV > 0) ? (_dV / _aV) * 100 : null;
 
         if (eps != null || pe != null || fcfTotal != null) {
