@@ -241,7 +241,8 @@
 
   <nav class="nav">
     <button class="nav-btn active" data-section="sim-section">Simulare</button>
-    <button class="nav-btn" data-section="watchlist-section">📌 Urmărit <span id="watchlist-count" style="display:none;background:rgba(79,195,247,0.25);border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;">0</span></button>
+    <button class="nav-btn" data-section="folders-section">📁 Foldere</button>
+    <button class="nav-btn" data-section="compare-section">📊 Comparații</button>
     <button class="nav-btn" data-section="about-section">Despre</button>
   </nav>
 
@@ -303,7 +304,7 @@
                       background:rgba(255,238,88,0.05);border:1px solid rgba(255,238,88,0.18);
                       border-radius:7px;font-size:10.5px;color:rgba(255,238,88,0.75);line-height:1.6;">
             <strong style="color:rgba(255,238,88,0.95)">ℹ️ Unități:</strong>
-            &nbsp;Active / Cash / Datorii → <strong>milioane</strong>
+            &nbsp;Active / Cash / Pasive totale → <strong>milioane</strong>
             <span style="opacity:0.65">(ex: 10 miliarde = <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;font-size:10px">10000</code>)</span>
             &nbsp;·&nbsp; Acțiuni → <strong>milioane acțiuni</strong>
             <span style="opacity:0.65">(ex: 152 mil acț = <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;font-size:10px">152</code>)</span>
@@ -371,8 +372,8 @@
               <input type="number" id="val-cash" placeholder="ex: 1200" step="1">
             </div>
             <div class="val-input-group">
-              <label for="val-debt">Datorii (M)</label>
-              <input type="number" id="val-debt" placeholder="ex: 3500" step="1">
+              <label for="val-totalLiabilities" title="Pasive totale (datorii + obligații) — folosit pentru calculul NAV = Active − Pasive totale">Pasive totale (M)</label>
+              <input type="number" id="val-totalLiabilities" placeholder="ex: 322000" step="1">
             </div>
             <div class="val-input-group">
               <label for="val-shares">Acțiuni (M)</label>
@@ -415,14 +416,21 @@
             </div>
           </div>
 
-          <!-- ── Buton Validare AI ── -->
-          <div style="margin-bottom:8px;">
+          <!-- ── Butoane Validare AI ── -->
+          <div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;">
             <button id="val-ai-validate-btn" onclick="window._runAIValidation()"
               style="display:none;padding:5px 15px;border-radius:14px;
                      border:1px solid rgba(79,195,247,0.4);background:rgba(79,195,247,0.07);
                      color:#4fc3f7;font-size:10.5px;font-weight:700;cursor:pointer;
                      letter-spacing:0.3px;transition:opacity 0.2s;">
-              🤖 Validare AI
+              ◆ Claude
+            </button>
+            <button id="val-gemini-validate-btn" onclick="window._runGeminiValidation()"
+              style="display:none;padding:5px 15px;border-radius:14px;
+                     border:1px solid rgba(179,157,219,0.4);background:rgba(179,157,219,0.07);
+                     color:#b39ddb;font-size:10.5px;font-weight:700;cursor:pointer;
+                     letter-spacing:0.3px;transition:opacity 0.2s;">
+              ✦ Gemini
             </button>
           </div>
 
@@ -433,7 +441,7 @@
             <!-- populated dynamically -->
           </div>
           <div style="margin-top:10px;font-size:9px;color:rgba(255,255,255,0.20);line-height:1.6;">
-            NAV: (Active + Cash − Datorii) / Acțiuni_M &nbsp;·&nbsp;
+            NAV: (Active − Pasive totale) / Acțiuni_M &nbsp;·&nbsp;
             DCF: FCF × (1+g)ⁿ actualizat cu WACC, 10 ani + valoare terminală &nbsp;·&nbsp;
             Marja = (Val.Ponderata − Pret) / Pret
           </div>
@@ -462,6 +470,18 @@
           </div>
           <div id="stock-ticker" class="stock-ticker">—</div>
           <div id="sector-badge"></div>
+          <div id="ticker-note-wrap" style="display:none;margin-top:6px">
+            <textarea id="ticker-note-input"
+              placeholder="Notițe personale…"
+              rows="2"
+              style="width:100%;box-sizing:border-box;resize:vertical;
+                     background:rgba(255,255,255,0.03);
+                     border:1px solid rgba(255,255,255,0.08);border-radius:6px;
+                     color:#aaa;font-size:11.5px;padding:6px 10px;
+                     font-family:inherit;outline:none;transition:border-color .15s"
+              onfocus="this.style.borderColor='rgba(79,195,247,0.35)'"
+              onblur="this.style.borderColor='rgba(255,255,255,0.08)'"></textarea>
+          </div>
           <div style="margin-top:8px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
             <div style="font-size:11px; letter-spacing:1.5px; text-transform:uppercase;
                         color:rgba(124,106,247,0.8); font-family:var(--font-sans);">
@@ -573,6 +593,12 @@
               <div class="tip-bubble">
                 <strong>📈 GARCH(1,1) — Volatilitate actuala</strong>
                 Volatilitatea conditionata <em>acum</em>, estimata din ultimele 60 de zile. Reflecta regimul curent al pietei, nu media istorica.
+                <div style="margin:5px 0 4px;font-size:10px;color:rgba(255,255,255,0.55);border-top:1px solid rgba(255,255,255,0.1);padding-top:5px;">
+                  <strong style="color:rgba(255,255,255,0.75);">Metoda estimare:</strong> grid-search MLE pe log-likelihood Gaussian<br>
+                  LL = −½ Σ [log(σ²_t) + ε²_t / σ²_t]<br>
+                  Grid coarsat α,β pas 0.02 → rafinare locala pas 0.002<br>
+                  ω ancorat la varianta pe termen lung → spatiu 2D
+                </div>
                 <div class="tip-scale">
                   <div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> 🟢 sub medie — piata calma</div>
                   <div class="tip-scale-row"><span class="tip-dot" style="background:#ffee58"></span> 🟡 aproape de medie — normal</div>
@@ -630,9 +656,10 @@
               <i class="tip-icon">i</i>
               <div class="tip-bubble">
                 <strong>🔄 Persistenta GARCH (α+β)</strong>
-                Cat de "lipicioasa" e volatilitatea — cat timp dureaza un soc pana se disipa.
+                Cat de "lipicioasa" e volatilitatea — cat timp dureaza un soc pana se disipa. Estimata prin MLE, fara clampare artificiala.
                 <div class="tip-scale">
-                  <div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> &lt; 85% — socurile dispar rapid</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> &lt; 70% — vol. foarte stabila (utilit., REIT)</div>
+                  <div class="tip-scale-row"><span class="tip-dot" style="background:#66bb6a"></span> 70–85% — socurile dispar rapid</div>
                   <div class="tip-scale-row"><span class="tip-dot" style="background:#ffee58"></span> 85–95% — volatilitate persistenta</div>
                   <div class="tip-scale-row"><span class="tip-dot" style="background:#ef5350"></span> &gt; 95% — soc dureaza saptamani</div>
                 </div>
@@ -724,7 +751,7 @@
       </div>
 
       <div class="price-chart-box">
-        <div class="chart-label">Pret istoric — ultimele 60 zile</div>
+        <div class="chart-label">Pret istoric — ultimele 180 zile · estimat 30 zile</div>
         <div class="canvas-wrap"><canvas id="price-chart"></canvas></div>
       </div>
 
@@ -748,44 +775,74 @@
 
   </section>
 
-  <!-- ── SECTIUNEA URMARIT ──────────────────────────── -->
-  <section id="watchlist-section" class="section">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+  <!-- ── SECTIUNEA FOLDERE ────────────────────────────── -->
+  <section id="folders-section" class="section">
+    <div id="folders-panel"></div>
+  </section>
+
+  <!-- ── SECTIUNEA COMPARATII ──────────────────────────── -->
+  <section id="compare-section" class="section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
       <div>
-        <div style="font-size:17px; font-weight:700; color:#e0e0e0; letter-spacing:0.5px;">📌 Vandute de urmărit</div>
-        <div style="font-size:11px; color:rgba(255,255,255,0.35); margin-top:3px;">Snapshot-uri salvate din simulari anterioare</div>
+        <div style="font-size:17px;font-weight:700;color:#e0e0e0;letter-spacing:0.5px;">📊 Comparații Simulări</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:3px;">Selectează 2–4 simulări pentru a le compara</div>
       </div>
-      <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button id="export-watchlist-btn" style="padding:7px 16px; border-radius:20px;
-             border:1px solid rgba(102,187,106,0.4); background:rgba(102,187,106,0.08);
-             color:#66bb6a; font-size:11.5px; cursor:pointer; font-weight:600;"
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <span id="compare-selection-badge" style="display:none;background:rgba(79,195,247,0.2);color:#4fc3f7;
+              border-radius:12px;padding:2px 10px;font-size:11px;font-weight:700;"></span>
+        <button id="compare-run-btn" style="padding:7px 16px;border-radius:20px;
+             border:1px solid rgba(124,106,247,0.5);background:rgba(124,106,247,0.12);
+             color:#b39ddb;font-size:11.5px;cursor:pointer;font-weight:600;"
+             onmouseover="this.style.background='rgba(124,106,247,0.25)'"
+             onmouseout="this.style.background='rgba(124,106,247,0.12)'">
+          ⚡ Compară selectate
+        </button>
+        <button id="compare-export-btn" style="padding:7px 16px;border-radius:20px;
+             border:1px solid rgba(102,187,106,0.4);background:rgba(102,187,106,0.08);
+             color:#66bb6a;font-size:11.5px;cursor:pointer;font-weight:600;"
              onmouseover="this.style.background='rgba(102,187,106,0.18)'"
              onmouseout="this.style.background='rgba(102,187,106,0.08)'">
-          ⬇ Export HTML
+          ⬇ Export DB
         </button>
-        <button id="import-watchlist-btn" style="padding:7px 16px; border-radius:20px;
-             border:1px solid rgba(79,195,247,0.4); background:rgba(79,195,247,0.07);
-             color:#4fc3f7; font-size:11.5px; cursor:pointer; font-weight:600;"
+        <button id="compare-import-btn" style="padding:7px 16px;border-radius:20px;
+             border:1px solid rgba(79,195,247,0.4);background:rgba(79,195,247,0.07);
+             color:#4fc3f7;font-size:11.5px;cursor:pointer;font-weight:600;"
              onmouseover="this.style.background='rgba(79,195,247,0.16)'"
              onmouseout="this.style.background='rgba(79,195,247,0.07)'">
-          ⬆ Import HTML
+          ⬆ Import DB
         </button>
-        <input type="file" id="import-watchlist-input" accept=".html" multiple
-               style="display:none;">
-        <button id="clear-watchlist-btn" style="padding:7px 16px; border-radius:20px;
-             border:1px solid rgba(239,83,80,0.3); background:rgba(239,83,80,0.06);
-             color:#ef5350; font-size:11.5px; cursor:pointer; font-weight:600;"
-             onmouseover="this.style.background='rgba(239,83,80,0.15)'"
-             onmouseout="this.style.background='rgba(239,83,80,0.06)'">
-          🗑 Șterge tot
-        </button>
+        <input type="file" id="compare-import-input" accept=".json" style="display:none;">
       </div>
     </div>
-    <div id="watchlist-empty" style="text-align:center; padding:60px 20px; color:rgba(255,255,255,0.25); font-size:13px;">
-      Nicio acțiune salvată încă.<br>
-      <span style="font-size:11px;">Rulează o simulare și apasă 📌 Adaugă la urmărit.</span>
+
+    <div id="compare-folder-chips"
+         style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:12px;"></div>
+
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <input type="text" id="compare-search" placeholder="Filtrează după ticker (ex: AAPL)"
+             style="flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);
+                    border-radius:6px;padding:8px 12px;color:#e0e0e0;font-family:'Space Mono',monospace;
+                    font-size:12px;outline:none;" />
+      <button id="compare-search-btn" style="padding:8px 16px;border-radius:6px;
+           border:1px solid rgba(79,195,247,0.4);background:rgba(79,195,247,0.08);
+           color:#4fc3f7;font-size:11.5px;cursor:pointer;font-weight:600;">
+        🔍 Caută
+      </button>
     </div>
-    <div id="watchlist-cards" style="display:flex; flex-direction:column; gap:12px;"></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.3);text-transform:uppercase;
+                    letter-spacing:0.6px;margin-bottom:8px;">Simulări salvate</div>
+        <div id="compare-list" style="max-height:500px;overflow-y:auto;
+             scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.15) transparent;"></div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.3);text-transform:uppercase;
+                    letter-spacing:0.6px;margin-bottom:8px;">Rezultate comparație</div>
+        <div id="compare-result"></div>
+      </div>
+    </div>
   </section>
 
   <section id="about-section" class="section">
