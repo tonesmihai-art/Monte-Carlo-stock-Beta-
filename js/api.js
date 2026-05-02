@@ -9,13 +9,28 @@ function _metaNum(v) {
   return isFinite(v) ? v : null;
 }
 
-// ── Yahoo Finance via CORS proxy ─────────────────────
+// ── Yahoo Finance via CORS proxy (cu fallback MY_PROXY) ──
 export async function fetchStockData(ticker) {
-  const url   = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`;
-  const proxy = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-  const r     = await fetch(proxy);
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  const data  = await r.json();
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1y`;
+
+  const proxies = [
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    ...(MY_PROXY ? [`${MY_PROXY}/proxy?url=${encodeURIComponent(url)}`] : []),
+  ];
+
+  let data = null;
+  let lastErr = null;
+  for (const px of proxies) {
+    try {
+      const r = await fetch(px, { signal: AbortSignal.timeout(12000) });
+      if (!r.ok) { lastErr = new Error(`HTTP ${r.status}`); continue; }
+      const json = await r.json();
+      if (json?.chart?.result?.[0]) { data = json; break; }
+    } catch (e) { lastErr = e; }
+  }
+  if (!data) throw lastErr ?? new Error('Date indisponibile pentru ' + ticker);
+
   const result = data?.chart?.result?.[0];
   if (!result) throw new Error('Ticker invalid sau date indisponibile');
   const closes     = result.indicators.quote[0].close.filter(Boolean);
@@ -268,9 +283,10 @@ async function _fetchFinnhub(ticker) {
       fcfPerShare: d.fcfPerShare ?? null,
       growth:      d.growth      ?? null,
       shares:      d.shares      ?? null,
-      totalAssets: toM(d.totalAssets),
-      cash:        toM(d.cash),
-      debt:        toM(d.debt),
+      totalAssets:      toM(d.totalAssets),
+      totalLiabilities: toM(d.totalLiabilities),
+      cash:             toM(d.cash),
+      debt:             toM(d.debt),
     };
   } catch (_) { return {}; }
 }
@@ -464,8 +480,9 @@ async function _fetchSEC(ticker) {
     return null;
   }
 
-  const [assets, cash, debt, opCF, capex, sharesN, epsDiluted, epsBasic] = await Promise.all([
+  const [assets, liabilities, cash, debt, opCF, capex, sharesN, epsDiluted, epsBasic] = await Promise.all([
     getConcept('Assets', null),
+    getConcept('Liabilities', null),
     getConcept('CashAndCashEquivalentsAtCarryingValue', 'CashAndCashEquivalents'),
     getConcept('LongTermDebt', 'LongTermDebtNoncurrent'),
     getConcept('NetCashProvidedByUsedInOperatingActivities', 'CashFlowsFromUsedInOperatingActivities'),
@@ -480,12 +497,13 @@ async function _fetchSEC(ticker) {
   const fcf  = opCF != null ? opCF - (capex ?? 0) : null;
   const eps  = epsDiluted ?? epsBasic ?? null;
   return {
-    totalAssets: assets    != null ? assets    / 1e6 : null,
-    cash:        cash      != null ? cash      / 1e6 : null,
-    debt:        debt      != null ? debt      / 1e6 : null,
-    shares:      rawShares != null ? rawShares / 1e6 : null,
-    fcfTotal:    fcf       != null ? fcf       / 1e6 : null,
-    fcfPerShare: (fcf != null && rawShares > 0) ? fcf / rawShares : null,
+    totalAssets:      assets      != null ? assets      / 1e6 : null,
+    totalLiabilities: liabilities != null ? liabilities / 1e6 : null,
+    cash:             cash        != null ? cash        / 1e6 : null,
+    debt:             debt        != null ? debt        / 1e6 : null,
+    shares:           rawShares   != null ? rawShares   / 1e6 : null,
+    fcfTotal:         fcf         != null ? fcf         / 1e6 : null,
+    fcfPerShare:      (fcf != null && rawShares > 0) ? fcf / rawShares : null,
     eps,
   };
 }
@@ -523,25 +541,30 @@ async function _fetchYahooFundamentals(ticker) {
           const sharesRaw = _yv(ks.sharesOutstanding);
           const fcfTotal  = _yv(fd.freeCashflow);
           const totalAssetsRaw = _yv(fd.totalAssets) ?? _yv(bs.totalAssets) ?? _yv(bsQ.totalAssets);
+          const totalLiabRaw   = _yv(fd.totalLiabilities)
+                              ?? _yv(bs.totalLiabilitiesNetMinorityInterest)
+                              ?? _yv(bsQ.totalLiabilitiesNetMinorityInterest);
           const eps    = _yv(ks.trailingEps);
           const pe     = _yv(sd.trailingPE) ?? _yv(sd.forwardPE) ?? _yv(ks.trailingPE) ?? null;
-          const growth = _yv(fd.earningsGrowth) != null ? _yv(fd.earningsGrowth) * 100
-                       : _yv(fd.revenueGrowth)  != null ? _yv(fd.revenueGrowth)  * 100 : null;
+          const growth = _yv(fd.earningsGrowth)      != null ? _yv(fd.earningsGrowth)      * 100
+                       : _yv(fd.revenueGrowth)       != null ? _yv(fd.revenueGrowth)       * 100
+                       : _yv(ks.earningsQuarterlyGrowth) != null ? _yv(ks.earningsQuarterlyGrowth) * 100 : null;
           const dividendRate  = _yv(sd.dividendRate)  ?? null;
           const dividendYield = _yv(sd.dividendYield) != null ? _yv(sd.dividendYield) * 100 : null;
           const _debtV   = _yv(fd.totalDebt);
           const ltv = (_debtV != null && totalAssetsRaw > 0) ? (_debtV / totalAssetsRaw) * 100 : null;
-          console.log(`[Proxy] ${ticker} — eps=${eps} pe=${pe} fcf=${fcfTotal} shares=${sharesRaw} totalAssets=${totalAssetsRaw}`,
+          console.log(`[Proxy] ${ticker} — eps=${eps} pe=${pe} fcf=${fcfTotal} shares=${sharesRaw} totalAssets=${totalAssetsRaw} totalLiab=${totalLiabRaw}`,
             'ks.trailingEps=', ks.trailingEps, 'sd.trailingPE=', sd.trailingPE);
           if (eps != null || pe != null || fcfTotal != null) {
             return {
               eps, pe, growth,
               dividendRate, dividendYield, ltv,
-              shares:      sharesRaw != null ? sharesRaw / 1e6 : null,
-              fcfPerShare: (fcfTotal != null && sharesRaw > 0) ? fcfTotal / sharesRaw : null,
-              cash:        _yv(fd.totalCash)   != null ? _yv(fd.totalCash)   / 1e6 : null,
-              debt:        _yv(fd.totalDebt)   != null ? _yv(fd.totalDebt)   / 1e6 : null,
-              totalAssets: totalAssetsRaw      != null ? totalAssetsRaw      / 1e6 : null,
+              shares:           sharesRaw      != null ? sharesRaw      / 1e6 : null,
+              fcfPerShare:      (fcfTotal != null && sharesRaw > 0) ? fcfTotal / sharesRaw : null,
+              cash:             _yv(fd.totalCash)   != null ? _yv(fd.totalCash)   / 1e6 : null,
+              debt:             _yv(fd.totalDebt)   != null ? _yv(fd.totalDebt)   / 1e6 : null,
+              totalAssets:      totalAssetsRaw      != null ? totalAssetsRaw      / 1e6 : null,
+              totalLiabilities: totalLiabRaw        != null ? totalLiabRaw        / 1e6 : null,
             };
           }
         }
@@ -568,23 +591,28 @@ async function _fetchYahooFundamentals(ticker) {
 
         const eps    = _yv(ks.trailingEps);
         const pe     = _yv(sd.trailingPE) ?? _yv(sd.forwardPE) ?? _yv(ks.trailingPE) ?? null;
-        const growth = _yv(fd.earningsGrowth) != null ? _yv(fd.earningsGrowth) * 100
-                     : _yv(fd.revenueGrowth)  != null ? _yv(fd.revenueGrowth)  * 100 : null;
+        const growth = _yv(fd.earningsGrowth)      != null ? _yv(fd.earningsGrowth)      * 100
+                     : _yv(fd.revenueGrowth)       != null ? _yv(fd.revenueGrowth)       * 100
+                     : _yv(ks.earningsQuarterlyGrowth) != null ? _yv(ks.earningsQuarterlyGrowth) * 100 : null;
         const dividendRate  = _yv(sd.dividendRate)  ?? null;
         const dividendYield = _yv(sd.dividendYield) != null ? _yv(sd.dividendYield) * 100 : null;
         const _dV  = _yv(fd.totalDebt);
         const _aV  = _yv(fd.totalAssets) ?? _yv(bs.totalAssets) ?? _yv(bsQ.totalAssets);
+        const _lV  = _yv(fd.totalLiabilities)
+                  ?? _yv(bs.totalLiabilitiesNetMinorityInterest)
+                  ?? _yv(bsQ.totalLiabilitiesNetMinorityInterest);
         const ltv  = (_dV != null && _aV > 0) ? (_dV / _aV) * 100 : null;
 
         if (eps != null || pe != null || fcfTotal != null) {
           return {
             eps, pe, growth,
             dividendRate, dividendYield, ltv,
-            shares:      sharesRaw != null ? sharesRaw / 1e6 : null,
-            fcfPerShare: fcfPS,
-            cash:        _yv(fd.totalCash) != null ? _yv(fd.totalCash) / 1e6 : null,
-            debt:        _yv(fd.totalDebt) != null ? _yv(fd.totalDebt) / 1e6 : null,
-            totalAssets: _aV              != null ? _aV              / 1e6 : null,
+            shares:           sharesRaw != null ? sharesRaw / 1e6 : null,
+            fcfPerShare:      fcfPS,
+            cash:             _yv(fd.totalCash) != null ? _yv(fd.totalCash) / 1e6 : null,
+            debt:             _yv(fd.totalDebt) != null ? _yv(fd.totalDebt) / 1e6 : null,
+            totalAssets:      _aV              != null ? _aV              / 1e6 : null,
+            totalLiabilities: _lV              != null ? _lV              / 1e6 : null,
           };
         }
       } catch (_) {}
@@ -605,13 +633,19 @@ async function _fetchYahooFundamentals(ticker) {
         if (typeof json !== 'object') continue;
         const q = json?.quoteResponse?.result?.[0];
         if (!q) continue;
-        const sharesQ = _yv(q.sharesOutstanding) ?? _yv(q.impliedSharesOutstanding) ?? null;
+        const sharesQ   = _yv(q.sharesOutstanding) ?? _yv(q.impliedSharesOutstanding) ?? null;
+        const divRateQ  = _yv(q.trailingAnnualDividendRate) ?? _yv(q.dividendRate) ?? null;
+        const divYieldQ = _yv(q.trailingAnnualDividendYield) != null
+                        ? _yv(q.trailingAnnualDividendYield) * 100
+                        : _yv(q.dividendYield) != null ? _yv(q.dividendYield) * 100 : null;
         return {
-          eps:    _yv(q.epsTrailingTwelveMonths) ?? _yv(q.trailingEps) ?? null,
-          pe:     _yv(q.trailingPE) ?? null,
-          growth: _yv(q.earningsGrowth) != null ? _yv(q.earningsGrowth) * 100
-                : _yv(q.revenueGrowth)  != null ? _yv(q.revenueGrowth)  * 100 : null,
-          shares: sharesQ != null ? sharesQ / 1e6 : null,
+          eps:          _yv(q.epsTrailingTwelveMonths) ?? _yv(q.trailingEps) ?? null,
+          pe:           _yv(q.trailingPE) ?? null,
+          growth:       _yv(q.earningsGrowth) != null ? _yv(q.earningsGrowth) * 100
+                      : _yv(q.revenueGrowth)  != null ? _yv(q.revenueGrowth)  * 100 : null,
+          shares:       sharesQ   != null ? sharesQ / 1e6 : null,
+          dividendRate: divRateQ,
+          dividendYield: divYieldQ,
         };
       } catch (_) {}
     }
@@ -625,7 +659,7 @@ async function _fetchYahooFundamentals(ticker) {
 async function _fetchYahooTimeseries(ticker) {
   const now    = Math.floor(Date.now() / 1000);
   const period = 1577836800; // 2020-01-01
-  const types  = 'annualTotalAssets,annualTotalDebt,annualCashAndCashEquivalents,annualFreeCashFlow';
+  const types  = 'annualTotalAssets,annualTotalLiabilitiesNetMinorityInterest,annualTotalDebt,annualCashAndCashEquivalents,annualFreeCashFlow';
   const tsUrl  = `https://query1.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${ticker}` +
                  `?type=${types}&period1=${period}&period2=${now}&lang=en-US`;
 
@@ -657,19 +691,21 @@ async function _fetchYahooTimeseries(ticker) {
         return null;
       };
 
-      const assets  = getLatest('annualTotalAssets');
-      const debt    = getLatest('annualTotalDebt');
-      const cash    = getLatest('annualCashAndCashEquivalents');
-      const fcfRaw  = getLatest('annualFreeCashFlow');
+      const assets      = getLatest('annualTotalAssets');
+      const liabilities = getLatest('annualTotalLiabilitiesNetMinorityInterest');
+      const debt        = getLatest('annualTotalDebt');
+      const cash        = getLatest('annualCashAndCashEquivalents');
+      const fcfRaw      = getLatest('annualFreeCashFlow');
 
       if (assets == null && debt == null) return null;
       const tsResult = {
-        totalAssets: assets != null ? assets / 1e6 : null,
-        debt:        debt   != null ? debt   / 1e6 : null,
-        cash:        cash   != null ? cash   / 1e6 : null,
-        fcfTotal:    fcfRaw != null ? fcfRaw / 1e6 : null,
+        totalAssets:      assets      != null ? assets      / 1e6 : null,
+        totalLiabilities: liabilities != null ? liabilities / 1e6 : null,
+        debt:             debt        != null ? debt        / 1e6 : null,
+        cash:             cash        != null ? cash        / 1e6 : null,
+        fcfTotal:         fcfRaw      != null ? fcfRaw      / 1e6 : null,
       };
-      console.log(`[Timeseries] ${ticker} — totalAssets=${tsResult.totalAssets} debt=${tsResult.debt} cash=${tsResult.cash} fcf=${tsResult.fcfTotal}`);
+      console.log(`[Timeseries] ${ticker} — totalAssets=${tsResult.totalAssets} totalLiab=${tsResult.totalLiabilities} debt=${tsResult.debt} cash=${tsResult.cash} fcf=${tsResult.fcfTotal}`);
       return tsResult;
     } catch (_) { return null; }
   };
@@ -681,6 +717,29 @@ async function _fetchYahooTimeseries(ticker) {
     if (r) return r;
   }
   return await tryUrl(tsUrl) ?? {};
+}
+
+// ── EPS + PE fallback din Yahoo chart meta (EU/nordic — Finnhub/quoteSummary pot fi null) ──
+// Nu foloseste MY_PROXY — evita presiune suplimentara pe IP-ul Render (rate-limit Yahoo)
+async function _fetchYahooChartMeta(ticker) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=5d`;
+  const proxies = [
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  ];
+  for (const px of proxies) {
+    try {
+      const r = await fetch(px, { signal: AbortSignal.timeout(8000) });
+      if (!r.ok) continue;
+      const json = await r.json();
+      const meta = json?.chart?.result?.[0]?.meta;
+      if (!meta) continue;
+      const eps = _metaNum(meta.epsTrailingTwelveMonths ?? null);
+      const pe  = _metaNum(meta.trailingPE ?? meta.forwardPE ?? null);
+      if (eps != null || pe != null) return { eps, pe };
+    } catch { /* încearcă următorul proxy */ }
+  }
+  return null;
 }
 
 export async function fetchValuationFundamentals(ticker) {
@@ -700,8 +759,23 @@ export async function fetchValuationFundamentals(ticker) {
   const quote = quoteR.status === 'fulfilled' ? quoteR.value : {};
 
   // ── Merge: Finnhub > SEC > Yahoo (primul non-null castiga) ──
-  const eps    = fh.eps    ?? sec.eps    ?? quote.eps    ?? null;
-  const pe     = fh.pe     ?? quote.pe                  ?? null;
+  let eps      = fh.eps    ?? sec.eps    ?? quote.eps    ?? null;
+  let _epsSource = fh.eps != null ? 'Finnhub' : sec.eps != null ? 'SEC' : quote.eps != null ? 'Yahoo' : null;
+  // Fallback EPS + PE: Yahoo chart meta — apelat DOAR cand eps lipseste dupa merge
+  // (evita cereri inutile care agraveaza rate-limiting Yahoo pe IP-ul Render)
+  let _chartMeta = null;
+  if (eps == null) {
+    _chartMeta = await _fetchYahooChartMeta(ticker);
+  }
+  if (eps == null && _chartMeta?.eps != null) {
+    eps = _chartMeta.eps;
+    _epsSource = 'Yahoo Chart';
+    console.info(`[EPS fallback] ${ticker}: meta.epsTrailingTwelveMonths → ${eps}`);
+  }
+  let pe = fh.pe ?? quote.pe ?? _chartMeta?.pe ?? null;
+  if (fh.pe == null && quote.pe == null && _chartMeta?.pe != null) {
+    console.info(`[PE fallback] ${ticker}: meta.trailingPE/forwardPE → ${pe}`);
+  }
   const shares = fh.shares ?? sec.shares ?? quote.shares ?? null;
   let growth   = fh.growth ?? quote.growth               ?? null;
 
@@ -722,25 +796,70 @@ export async function fetchValuationFundamentals(ticker) {
   if (fcfPerShare == null && sec.fcfTotal != null && shares != null && shares > 0) {
     fcfPerShare = sec.fcfTotal / shares;
   }
+  // ── Sanity checks FCF ────────────────────────────────────
+  const _eps = eps; // deja merge-uit, include fallback Yahoo Chart dacă a fost necesar
+
+  // A: FCF/act prea mic față de EPS pozitiv → date aberante (ex: Enagas Yahoo)
+  if (fcfPerShare != null && _eps != null && _eps > 0.5 && Math.abs(fcfPerShare) < _eps * 0.05) {
+    console.warn(`[FCF sanity A] ${ticker}: fcfPerShare=${fcfPerShare?.toFixed(3)} prea mic față de EPS=${_eps} → resetat`);
+    fcfPerShare = null;
+  }
+  // B: FCF/act prea mare față de EPS → posibil total raportat ca per-share (ex: 520M → 520)
+  if (fcfPerShare != null && _eps != null && _eps > 0.5 && fcfPerShare > _eps * 20) {
+    console.warn(`[FCF sanity B] ${ticker}: fcfPerShare=${fcfPerShare?.toFixed(2)} prea mare față de EPS=${_eps} (>${(_eps * 20).toFixed(2)}) → resetat`);
+    fcfPerShare = null;
+  }
+  // C: FCF negativ extrem față de EPS → eroare de semn sau magnitudine
+  if (fcfPerShare != null && _eps != null && _eps > 0.5 && fcfPerShare < -_eps * 10) {
+    console.warn(`[FCF sanity C] ${ticker}: fcfPerShare=${fcfPerShare?.toFixed(2)} negativ extrem față de EPS=${_eps} → resetat`);
+    fcfPerShare = null;
+  }
+  // D: FCF absolut implausibil (> 500) — independent de EPS, prinde cazurile cu EPS mic/negativ
+  if (fcfPerShare != null && Math.abs(fcfPerShare) > 500) {
+    console.warn(`[FCF sanity D] ${ticker}: |fcfPerShare|=${Math.abs(fcfPerShare).toFixed(2)} > 500 — magnitudine imposibilă → resetat`);
+    fcfPerShare = null;
+  }
+  // E: Shares sanity — warn only (nu există fallback)
+  if (shares != null && (shares < 0.01 || shares > 5_000_000)) {
+    console.warn(`[Shares sanity] ${ticker}: shares=${shares}M în afara intervalului rezonabil [10K, 5T] — posibil date eronate`);
+  }
+  // F: EPS/PE inconsistență — warn only
+  if (eps != null && pe != null && eps <= 0 && pe > 0) {
+    console.warn(`[EPS/PE sanity] ${ticker}: EPS=${eps} ≤ 0 dar PE=${pe} > 0 — date inconsistente din surse diferite`);
+  }
 
   // Bilant: Finnhub > SEC > Yahoo Timeseries > Yahoo quoteSummary
-  let totalAssets = fh.totalAssets ?? sec.totalAssets ?? null;
-  let cash        = fh.cash        ?? sec.cash  ?? quote.cash  ?? null;
-  let debt        = fh.debt        ?? sec.debt  ?? quote.debt  ?? null;
+  let totalAssets      = fh.totalAssets      ?? sec.totalAssets      ?? null;
+  let totalLiabilities = fh.totalLiabilities ?? sec.totalLiabilities ?? null;
+  let cash             = fh.cash             ?? sec.cash  ?? quote.cash  ?? null;
+  let debt             = fh.debt             ?? sec.debt  ?? quote.debt  ?? null;
 
 
   // ── Fallback Yahoo Timeseries (EU REITs — totalAssets adesea null in quoteSummary) ──
+  // Apelat si cand fcfPerShare == null — Finnhub poate returna bilant fara FCF pentru stocks nordice
   let tsData = {};
-  if (totalAssets == null || (cash == null && debt == null)) {
+  if (totalAssets == null || totalLiabilities == null || (cash == null && debt == null) || fcfPerShare == null) {
     tsData = await _fetchYahooTimeseries(ticker).catch(() => ({}));
   }
-  totalAssets = totalAssets ?? tsData.totalAssets ?? quote.totalAssets ?? null;
-  cash        = cash        ?? tsData.cash        ?? null;
-  debt        = debt        ?? tsData.debt        ?? null;
+  totalAssets      = totalAssets      ?? tsData.totalAssets      ?? quote.totalAssets      ?? null;
+  totalLiabilities = totalLiabilities ?? tsData.totalLiabilities ?? quote.totalLiabilities ?? null;
+  cash             = cash             ?? tsData.cash             ?? null;
+  debt             = debt             ?? tsData.debt             ?? null;
 
   // Actualizeaza fcfPerShare din timeseries daca inca lipseste
   if (fcfPerShare == null && tsData.fcfTotal != null && shares != null && shares > 0) {
-    fcfPerShare = tsData.fcfTotal / shares;
+    const _fcfTS = tsData.fcfTotal / shares;
+    // Re-aplica sanity checks si pe valoarea calculata din timeseries (G)
+    const _absTS = Math.abs(_fcfTS);
+    const _tooSmall = _eps != null && _eps > 0.5 && _absTS < _eps * 0.05;
+    const _tooLarge = _eps != null && _eps > 0.5 && _fcfTS > _eps * 20;
+    const _negExtrem = _eps != null && _eps > 0.5 && _fcfTS < -_eps * 10;
+    const _imposibil = _absTS > 500;
+    if (_tooSmall || _tooLarge || _negExtrem || _imposibil) {
+      console.warn(`[FCF sanity G/TS] ${ticker}: fcfPerShare calculat din timeseries=${_fcfTS?.toFixed(3)} invalid → ignorat`);
+    } else {
+      fcfPerShare = _fcfTS;
+    }
   }
 
   // ── Dividend + LTV — Yahoo sursa principala ──────────
@@ -758,35 +877,40 @@ export async function fetchValuationFundamentals(ticker) {
   : null;
 
   const sources = {
-    eps:      src3(fh.eps,         sec.eps,         quote.eps),
-    pe:       src3(fh.pe,          null,            quote.pe),
+    eps:      _epsSource,
+    pe:       fh.pe != null ? 'Finnhub' : quote.pe != null ? 'Yahoo' : _chartMeta?.pe != null ? 'Yahoo Chart' : null,
     fcf:      src3(fh.fcfPerShare, sec.fcfPerShare, quote.fcfPerShare)
               ?? (tsData.fcfTotal != null ? 'Yahoo TS' : null)
               ?? (sec.fcfTotal    != null ? 'SEC calc' : null),
     growth:   src3(fh.growth,      null,            quote.growth),
     shares:   src3(fh.shares,      sec.shares,      quote.shares),
-    assets:   fh.totalAssets  != null ? 'Finnhub'
-            : sec.totalAssets != null ? 'SEC'
-            : tsData.totalAssets != null ? 'Yahoo TS'
-            : quote.totalAssets != null  ? 'Yahoo'
-            : null,
-    cash:     fh.cash   != null ? 'Finnhub'
-            : sec.cash  != null ? 'SEC'
-            : tsData.cash != null ? 'Yahoo TS'
-            : quote.cash  != null ? 'Yahoo'
-            : null,
-    debt:     fh.debt   != null ? 'Finnhub'
-            : sec.debt  != null ? 'SEC'
-            : tsData.debt != null ? 'Yahoo TS'
-            : quote.debt  != null ? 'Yahoo'
-            : null,
+    assets:           fh.totalAssets       != null ? 'Finnhub'
+                    : sec.totalAssets      != null ? 'SEC'
+                    : tsData.totalAssets   != null ? 'Yahoo TS'
+                    : quote.totalAssets    != null ? 'Yahoo'
+                    : null,
+    totalLiabilities: fh.totalLiabilities        != null ? 'Finnhub'
+                    : sec.totalLiabilities        != null ? 'SEC'
+                    : tsData.totalLiabilities     != null ? 'Yahoo TS'
+                    : quote.totalLiabilities      != null ? 'Yahoo'
+                    : null,
+    cash:             fh.cash   != null ? 'Finnhub'
+                    : sec.cash  != null ? 'SEC'
+                    : tsData.cash != null ? 'Yahoo TS'
+                    : quote.cash  != null ? 'Yahoo'
+                    : null,
+    debt:             fh.debt   != null ? 'Finnhub'
+                    : sec.debt  != null ? 'SEC'
+                    : tsData.debt != null ? 'Yahoo TS'
+                    : quote.debt  != null ? 'Yahoo'
+                    : null,
     dividend: dividendRate != null ? 'Yahoo' : null,
   };
 
   const result = {
     eps, pe, growth, shares, fcfPerShare,
-    fcfTotal:    sec.fcfTotal ?? tsData.fcfTotal ?? null,
-    totalAssets, cash, debt,
+    fcfTotal:         sec.fcfTotal ?? tsData.fcfTotal ?? null,
+    totalAssets, totalLiabilities, cash, debt,
     dividendRate, dividendYield, ltv,
     sources,
   };
